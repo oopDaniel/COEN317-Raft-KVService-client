@@ -1,0 +1,11 @@
+{
+  "name": "coen317-raft-kv_service-client",
+  "version": "0.0.1",
+  "description": "Client of key/value storage service based on Raft",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Daniel Chiang",
+  "license": "ISC"
+}
