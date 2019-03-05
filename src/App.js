@@ -1,25 +1,36 @@
 import React, { Component } from 'react';
-import logo from './logo.svg';
-import './App.css';
+import style from './App.css';
+import Machines from './Machines/Machines'
+import Sidebar from './Sidebar/Sidebar'
 
 class App extends Component {
+  constructor() {
+    super()
+    this.state = {
+      selectedMachine: null
+    }
+    this.handleMachineSelection = this.handleMachineSelection.bind(this)
+  }
+
+  handleMachineSelection (selectedMachine) {
+    if (this.state.selectedMachine === null || this.state.selectedMachine !== selectedMachine) {
+      this.setState({ selectedMachine })
+    } else {
+      this.setState({ selectedMachine: null })
+    }
+  }
+
   render() {
     return (
       <div className="App">
-        <header className="App-header">
-          <img src={logo} className="App-logo" alt="logo" />
-          <p>
-            Edit <code>src/App.js</code> and save to reload.
-          </p>
-          <a
-            className="App-link"
-            href="https://reactjs.org"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Learn React
-          </a>
-        </header>
+        <Machines
+          customClass={style.Machine}
+          selectMachine={this.handleMachineSelection}
+        />
+        <Sidebar
+          customClass={style.Sidebar}
+          selectedMachine={this.state.selectedMachine}
+        />
       </div>
     );
   }
