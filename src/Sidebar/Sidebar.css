@@ -13,27 +13,7 @@
 
 .sidebar-option {
   display: inline-flex;
-  padding: .8rem;
   margin: 1.2rem;
-  min-width: 96px;
-  max-width: 120px;
-  border-radius: 8px;
-  color: white;
-  background-color: rgb(95, 204, 204);
-  transition: background-color .3s;
-  cursor: pointer;
-}
-.sidebar-option:hover {
-  background-color: var(--hover);
-}
-.sidebar-option.grey-out {
-  background-color: rgb(158, 156, 156);
-  color: rgb(221, 219, 219);
-  cursor: not-allowed;
-}
-.sidebar-option.selected {
-  background-color: var(--selected);
-  cursor: default;
 }
 
 .sidebar-content {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import SidebarLogs from './SidebarLogs/SidebarLogs'
 import SidebarActions from './SidebarActions/SidebarActions'
+import Btn from '../shared/Button/Button'
 import './Sidebar.css';
 
 function Sidebar ({selectedMachine, customClass}) {
@@ -24,19 +25,22 @@ function Sidebar ({selectedMachine, customClass}) {
   return (
     <div className={`sidebar ${customClass}`}>
       <header className="sidebar-options flex-center">
-        <span
-          className={`sidebar-option flex-center ${isLogs ? 'selected' : ''}`}
+        <Btn
+          customClass={`sidebar-option flex-center`}
+          active={isLogs}
           onClick={() => handleBtnClick(true)}
         >
           Logs
-        </span>
-
-        <span
-          className={`sidebar-option flex-center ${hasSelected ? '' : 'grey-out'} ${!isLogs ? 'selected' : ''}`}
+        </Btn>
+        <Btn
+          customClass={`sidebar-option flex-center`}
+          active={!isLogs}
           onClick={() => handleBtnClick(false)}
+          disabled={!hasSelected}
         >
           Actions
-        </span>
+        </Btn>
+
       </header>
       <div className="sidebar-content">
         <div className="sidebar-title flex-center">
