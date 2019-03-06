@@ -1,4 +1,42 @@
 .sidebar-actions {
   flex: 1;
-  background-color: violet;
+}
+
+.form {
+  padding: 2rem 0 5rem;
+}
+
+.input {
+  display: inline-block;
+  padding: 0 20px;
+  height: 60px;
+  line-height: 60px;
+  box-sizing: border-box;
+  color: #606266;
+  font-size: 1.6rem;
+  outline: none;
+  border: 1px solid #dcdfe6;
+  border-radius: 8px;
+  background-color: #fff;
+  transition: border-color .2s cubic-bezier(.645,.045,.355,1);
+}
+
+.input + .input {
+  margin-top: 2rem;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #409eff;
+}
+
+::-webkit-input-placeholder {
+  color: #c0c4cc;
+}
+
+.buttons .btn {
+  font-size: 1.4rem;
+}
+.buttons .btn + .btn {
+  margin-left: 2rem;
 }
