@@ -11,7 +11,10 @@ function Sidebar ({selectedMachine, customClass}) {
     if (!hasSelected) setIsLogs(true)
   }, [hasSelected])
 
-  const handleBtnClick = (isClickingLogs) => setIsLogs(isClickingLogs)
+  const handleBtnClick = (isClickingLogs) => {
+    if (!hasSelected) return
+    setIsLogs(isClickingLogs)
+  }
 
   const renderTitle = (hasSelected) => {
     if (hasSelected) return `${isLogs ? 'Logs' : 'Actions'} on Machine <${selectedMachine}>`

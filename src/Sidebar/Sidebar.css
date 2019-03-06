@@ -27,8 +27,8 @@
   background-color: var(--hover);
 }
 .sidebar-option.grey-out {
-  background-color: grey;
-  color: gainsboro;
+  background-color: rgb(158, 156, 156);
+  color: rgb(221, 219, 219);
   cursor: not-allowed;
 }
 .sidebar-option.selected {
