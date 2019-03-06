@@ -6,10 +6,14 @@ function SidebarActions ({ onCommand }) {
   const [key, setKey] = useState('')
   const [value, setValue] = useState('')
 
-  const startCommand = (isRead) => () => onCommand({
-    operation: isRead ? 'GET' : 'SET',
-    data: { key, value }
-  })
+  const startCommand = (isRead) => () => {
+    setKey('')
+    setValue('')
+    onCommand({
+      operation: isRead ? 'GET' : 'SET',
+      data: { key, value }
+    })
+  }
 
   return (
     <div className="sidebar-actions">
