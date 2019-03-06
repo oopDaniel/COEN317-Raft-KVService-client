@@ -14,7 +14,7 @@
   flex-direction: column;
   transition: color .3s;
   cursor: pointer;
-  color: #282c34;
+  color: var(--black);
 }
 .machine svg {
   font-size: 2em;

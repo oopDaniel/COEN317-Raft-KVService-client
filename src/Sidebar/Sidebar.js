@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import SidebarLogs from './SidebarLogs/SidebarLogs'
 import SidebarActions from './SidebarActions/SidebarActions'
 import Btn from '../shared/Button/Button'
-import { FaHeart, FaSkull } from 'react-icons/fa';
+import { FaHeart, FaSkull, FaPowerOff } from 'react-icons/fa';
 import './Sidebar.css';
 
 function Sidebar ({ selectedMachine, customClass, commands, appendCommand }) {
   const hasSelected = selectedMachine !== null
-  const isAlive = true // TODO: use status from server
   const [isLogs, setIsLogs] = useState(true)
+  const [isAlive, setIsAlive] = useState(true) // TODO: use status from server
 
   useEffect(() => {
     if (!hasSelected) setIsLogs(true)
@@ -23,6 +23,11 @@ function Sidebar ({ selectedMachine, customClass, commands, appendCommand }) {
     newCommand.server = selectedMachine
     // TODO: call API and return it as promiss
     appendCommand(newCommand)
+  }
+
+  // TODO: call API
+  const handlePowerBtn = () => {
+    setIsAlive(!isAlive)
   }
 
   const renderTitle = (hasSelected) => {
@@ -67,21 +72,29 @@ function Sidebar ({ selectedMachine, customClass, commands, appendCommand }) {
         {
           hasSelected &&
           <div className={`sidebar-footer flex-center ${isAlive ? 'alive' : 'dead'}`}>
-            Status: {
-              isAlive
-                ? (
-                  <div>
-                    <span className="status-text">Alive</span>
-                    <FaHeart />
-                  </div>
-                )
-                : (
-                  <div>
-                    <span className="status-text">Unreachable</span>
-                    <FaSkull />
-                  </div>
-                )
-            }
+            <div className="status-container flex-center">
+              Status: {
+                isAlive
+                  ? (
+                    <div>
+                      <span className="status-text">Alive</span>
+                      <FaHeart />
+                    </div>
+                  )
+                  : (
+                    <div>
+                      <span className="status-text">Unreachable</span>
+                      <FaSkull />
+                    </div>
+                  )
+              }
+            </div>
+            <span
+              className="power-switch"
+              onClick={handlePowerBtn}
+            >
+              <FaPowerOff />
+            </span>
           </div>
         }
 

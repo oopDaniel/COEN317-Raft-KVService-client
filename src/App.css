@@ -12,6 +12,7 @@
 :root {
   --selected: orange;
   --hover: #61DAFB;
+  --black: #282c34;
   --action-bar-height: 96px;
 }
 

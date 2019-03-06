@@ -5,7 +5,7 @@
 }
 
 .sidebar-options {
-  background-color: #282c34;
+  background-color: var(--black);
   font-size: calc(10px + 2vmin);
   color: white;
   height: var(--action-bar-height);
@@ -29,6 +29,7 @@
 
 .sidebar-footer {
   flex: 0 0 var(--footer-height);
+  position: relative;
   font-size: calc(8px + 2vmin);
 }
 
@@ -36,14 +37,25 @@
   padding: 0 1rem 0 .5rem;
   font-weight: bold;
 }
-.dead svg {
+.dead .status-container svg {
   color: grey;
   transform: scale(1.4);
 }
-.alive svg {
+.alive .status-container svg {
   color: #fe6c6f;
   animation: beat .4s ease infinite alternate;
 	transform-origin: center;
+}
+
+.power-switch {
+  position: absolute;
+  right: 5%;
+  cursor: pointer;
+  color: grey;
+  transition: color .3s;
+}
+.power-switch:hover {
+  color: var(--black);
 }
 
 @keyframes beat {
