@@ -24,11 +24,12 @@ class App extends Component {
     return (
       <div className="App">
         <Machines
-          customClass={style.Machine}
+          customClass={style.machine}
           selectMachine={this.handleMachineSelection}
+          selectedMachine={this.state.selectedMachine}
         />
         <Sidebar
-          customClass={style.Sidebar}
+          customClass={style.sidebar}
           selectedMachine={this.state.selectedMachine}
         />
       </div>

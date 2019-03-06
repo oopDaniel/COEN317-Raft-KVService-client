@@ -5,10 +5,16 @@
   height: 100%;
 }
 
-:local .Machine {
+:local .machine {
   flex: 3;
 }
 
-:local .Sidebar {
+:local .sidebar {
   flex: 1 0 120px;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
