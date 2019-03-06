@@ -1,9 +1,28 @@
-.Sidebar {
+.sidebar {
   background-color: wheat;
 }
 
-.Sidebar-options {
+.sidebar-options {
   background-color: #282c34;
   font-size: calc(10px + 2vmin);
   color: white;
+  height: 96px;
+}
+
+.sidebar-option {
+  display: inline-flex;
+  padding: .8rem;
+  margin: 1.2rem;
+  min-width: 96px;
+  max-width: 120px;
+  border-radius: 8px;
+  color: white;
+  background-color: goldenrod;
+  font-size: calc(10px + 2vmin);
+  transition: background-color .3s;
+  cursor: pointer;
+}
+
+.sidebar-option:hover {
+  background-color: orange;
 }
