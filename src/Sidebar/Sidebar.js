@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import SidebarLogs from './SidebarLogs/SidebarLogs'
+import SidebarActions from './SidebarActions/SidebarActions'
 import './Sidebar.css';
 
 function Sidebar ({selectedMachine, customClass}) {
@@ -33,10 +35,20 @@ function Sidebar ({selectedMachine, customClass}) {
           Actions
         </span>
       </header>
-      <div>
-        <div className="sidebar-title">
+      <div className="sidebar-content">
+        <div className="sidebar-title flex-center">
           { renderTitle(hasSelected) }
         </div>
+        {
+          isLogs ? <SidebarLogs/> : <SidebarActions />
+        }
+        {
+          hasSelected &&
+          <div className="sidebar-footer flex-center">
+            Status: Alive
+          </div>
+        }
+
       </div>
     </div>
   );
