@@ -7,9 +7,15 @@ class App extends Component {
   constructor() {
     super()
     this.state = {
-      selectedMachine: null
+      selectedMachine: null,
+      commands: []
     }
     this.handleMachineSelection = this.handleMachineSelection.bind(this)
+    this.appendCommand = this.appendCommand.bind(this)
+  }
+
+  appendCommand (newCommand) {
+    this.setState({ commands: [...this.state.commands, newCommand] })
   }
 
   handleMachineSelection (selectedMachine) {
@@ -31,6 +37,8 @@ class App extends Component {
         <Sidebar
           customClass={style.sidebar}
           selectedMachine={this.state.selectedMachine}
+          commands={this.state.commands}
+          appendCommand={this.appendCommand}
         />
       </div>
     );

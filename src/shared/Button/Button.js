@@ -1,9 +1,10 @@
 import React from 'react';
 import './Button.css';
 
+const noop = () => {}
 function Button ({
   customClass = '',
-  onClick = () => {},
+  onClick = noop,
   children = 'Click me',
   disabled = false,
   active = false
@@ -12,7 +13,7 @@ function Button ({
   return (
     <span
       className={`btn ${customClass} ${disabled ? 'disabled': ''} ${active ? 'active' : ''}`}
-      onClick={onClick}
+      onClick={disabled ? noop : onClick}
     >
       { children }
     </span>

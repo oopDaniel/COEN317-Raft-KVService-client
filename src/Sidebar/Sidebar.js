@@ -4,7 +4,7 @@ import SidebarActions from './SidebarActions/SidebarActions'
 import Btn from '../shared/Button/Button'
 import './Sidebar.css';
 
-function Sidebar ({selectedMachine, customClass}) {
+function Sidebar ({ selectedMachine, customClass, commands, appendCommand }) {
   const hasSelected = selectedMachine !== null
   const [isLogs, setIsLogs] = useState(true)
 
@@ -15,6 +15,11 @@ function Sidebar ({selectedMachine, customClass}) {
   const handleBtnClick = (isClickingLogs) => {
     if (!hasSelected) return
     setIsLogs(isClickingLogs)
+  }
+
+  const handleCommand = (newCommand) => {
+    // TODO: call API
+    appendCommand(newCommand)
   }
 
   const renderTitle = (hasSelected) => {
@@ -47,7 +52,13 @@ function Sidebar ({selectedMachine, customClass}) {
           { renderTitle(hasSelected) }
         </div>
         {
-          isLogs ? <SidebarLogs/> : <SidebarActions />
+          isLogs
+            ? <SidebarLogs
+              logs={commands}
+            />
+            : <SidebarActions
+              onCommand={handleCommand}
+            />
         }
         {
           hasSelected &&
