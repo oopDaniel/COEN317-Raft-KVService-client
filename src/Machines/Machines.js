@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Axios from 'axios';
 import { KNOWN_SERVER_IP } from '../shared/constants'
+import { FaDatabase } from 'react-icons/fa';
 import logo from './logo.svg';
 import './Machines.css';
 
@@ -21,10 +22,15 @@ function Machines (props) {
         {
           machines.map(id =>
             <div
-              className={`machine flex-center ${props.selectedMachine === id ? 'selected' : ''}`}
+              className="machine-container flex-center"
               key={id}
               onClick={() => props.selectMachine(id)}
-            >{id}</div>
+            >
+              <div className={`machine ${props.selectedMachine === id ? 'selected' : ''}`}>
+                <FaDatabase className="yo"/>
+                {id}
+              </div>
+            </div>
           )
         }
       </div>

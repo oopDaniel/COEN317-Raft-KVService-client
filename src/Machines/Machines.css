@@ -1,29 +1,29 @@
 .machine-list {
   display: flex;
-  margin: 2rem 4rem 0 4rem;
+  margin: 2rem 4rem 2rem 4rem;
+}
+
+.machine-container {
+  flex: 1;
+  margin: 0 1rem;
+  font-size: 2rem;
 }
 
 .machine {
-  flex: 1;
-  margin: 0 1rem;
-  width: 120px;
-  height: 36px;
-  border: 1px solid peru;
-  border-radius: 8px;
-  font-size: 1.5em;
-  transition: background-color .3s, color .3s, border-color .3s;
+  display: flex;
+  flex-direction: column;
+  transition: color .3s;
   cursor: pointer;
+  color: #282c34;
 }
-
+.machine svg {
+  font-size: 2em;
+}
 .machine:hover {
-  background: peru;
-  color: #fff;
+  color: peru;
 }
-
 .machine.selected {
-  background: chocolate;
-  border-color: chocolate;
-  color: aquamarine;
+  color: #61DAFB;
 }
 
 
