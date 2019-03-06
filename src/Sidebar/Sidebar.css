@@ -1,5 +1,6 @@
 .sidebar {
   background-color: wheat;
+  box-shadow: 0 14px 28px rgba(0,0,0,0.25), 0 10px 10px rgba(0,0,0,0.22);
 }
 
 .sidebar-options {
@@ -17,12 +18,24 @@
   max-width: 120px;
   border-radius: 8px;
   color: white;
-  background-color: goldenrod;
-  font-size: calc(10px + 2vmin);
+  background-color: rgb(95, 204, 204);
   transition: background-color .3s;
   cursor: pointer;
 }
-
 .sidebar-option:hover {
-  background-color: orange;
+  background-color: var(--hover);
+}
+.sidebar-option.grey-out {
+  background-color: grey;
+  color: gainsboro;
+  cursor: not-allowed;
+}
+.sidebar-option.selected {
+  background-color: var(--selected);
+  cursor: default;
+}
+
+.sidebar-title {
+  margin-top: .5rem;
+  font-size: calc(8px + 2vmin);
 }

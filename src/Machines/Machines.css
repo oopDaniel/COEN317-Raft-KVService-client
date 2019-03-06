@@ -20,10 +20,10 @@
   font-size: 2em;
 }
 .machine:hover {
-  color: peru;
+  color: var(--hover);
 }
 .machine.selected {
-  color: #61DAFB;
+  color: var(--selected);
 }
 
 

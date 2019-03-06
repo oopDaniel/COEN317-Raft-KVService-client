@@ -1,20 +1,45 @@
-import React, { Component } from 'react';
+import React, { useState, useEffect } from 'react';
 import './Sidebar.css';
 
-class Sidebar extends Component {
-  render() {
-    return (
-      <div className={`sidebar ${this.props.customClass}`}>
-        <header className="sidebar-options flex-center">
-          <span className="sidebar-option flex-center">Logs</span>
-          <span className="sidebar-option flex-center">Actions</span>
-        </header>
-        <div>
-          Selected: {this.props.selectedMachine === null ? 'N/A' : this.props.selectedMachine}
+function Sidebar ({selectedMachine, customClass}) {
+  const hasSelected = selectedMachine !== null
+  const [isLogs, setIsLogs] = useState(true)
+
+  useEffect(() => {
+    if (!hasSelected) setIsLogs(true)
+  }, [hasSelected])
+
+  const handleBtnClick = (isClickingLogs) => setIsLogs(isClickingLogs)
+
+  const renderTitle = (hasSelected) => {
+    if (hasSelected) return `${isLogs ? 'Logs' : 'Actions'} on Machine <${selectedMachine}>`
+    return 'Client Log History'
+  }
+
+  return (
+    <div className={`sidebar ${customClass}`}>
+      <header className="sidebar-options flex-center">
+        <span
+          className={`sidebar-option flex-center ${isLogs ? 'selected' : ''}`}
+          onClick={() => handleBtnClick(true)}
+        >
+          Logs
+        </span>
+
+        <span
+          className={`sidebar-option flex-center ${hasSelected ? '' : 'grey-out'} ${!isLogs ? 'selected' : ''}`}
+          onClick={() => handleBtnClick(false)}
+        >
+          Actions
+        </span>
+      </header>
+      <div>
+        <div className="sidebar-title">
+          { renderTitle(hasSelected) }
         </div>
       </div>
-    );
-  }
+    </div>
+  );
 }
 
 export default Sidebar;

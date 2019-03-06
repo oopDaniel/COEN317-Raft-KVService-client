@@ -5,6 +5,11 @@
   height: 100%;
 }
 
+:root {
+  --selected: orange;
+  --hover: #61DAFB;
+}
+
 :local .machine {
   flex: 3;
 }
