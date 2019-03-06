@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import SidebarLogs from './SidebarLogs/SidebarLogs'
 import SidebarActions from './SidebarActions/SidebarActions'
 import Btn from '../shared/Button/Button'
+import { FaHeart, FaSkull } from 'react-icons/fa';
 import './Sidebar.css';
 
 function Sidebar ({ selectedMachine, customClass, commands, appendCommand }) {
   const hasSelected = selectedMachine !== null
+  const isAlive = true // TODO: use status from server
   const [isLogs, setIsLogs] = useState(true)
 
   useEffect(() => {
@@ -64,8 +66,22 @@ function Sidebar ({ selectedMachine, customClass, commands, appendCommand }) {
         }
         {
           hasSelected &&
-          <div className="sidebar-footer flex-center">
-            Status: Alive
+          <div className={`sidebar-footer flex-center ${isAlive ? 'alive' : 'dead'}`}>
+            Status: {
+              isAlive
+                ? (
+                  <div>
+                    <span className="status-text">Alive</span>
+                    <FaHeart />
+                  </div>
+                )
+                : (
+                  <div>
+                    <span className="status-text">Unreachable</span>
+                    <FaSkull />
+                  </div>
+                )
+            }
           </div>
         }
 

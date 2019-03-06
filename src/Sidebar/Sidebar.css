@@ -31,3 +31,21 @@
   flex: 0 0 var(--footer-height);
   font-size: calc(8px + 2vmin);
 }
+
+.status-text {
+  padding: 0 1rem 0 .5rem;
+  font-weight: bold;
+}
+.dead svg {
+  color: grey;
+  transform: scale(1.4);
+}
+.alive svg {
+  color: #fe6c6f;
+  animation: beat .4s ease infinite alternate;
+	transform-origin: center;
+}
+
+@keyframes beat {
+	to { transform: scale(1.4); }
+}

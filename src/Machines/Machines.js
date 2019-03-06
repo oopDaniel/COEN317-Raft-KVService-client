@@ -27,7 +27,7 @@ function Machines (props) {
               onClick={() => props.selectMachine(id)}
             >
               <div className={`machine ${props.selectedMachine === id ? 'selected' : ''}`}>
-                <FaDatabase className="yo"/>
+                <FaDatabase/>
                 {id}
               </div>
             </div>
