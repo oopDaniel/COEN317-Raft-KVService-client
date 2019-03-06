@@ -18,6 +18,7 @@ function Sidebar ({ selectedMachine, customClass, commands, appendCommand }) {
   }
 
   const handleCommand = (newCommand) => {
+    newCommand.server = selectedMachine
     // TODO: call API and return it as promiss
     appendCommand(newCommand)
   }
@@ -55,6 +56,7 @@ function Sidebar ({ selectedMachine, customClass, commands, appendCommand }) {
           isLogs
             ? <SidebarLogs
               logs={commands}
+              hideFooter={hasSelected}
             />
             : <SidebarActions
               onCommand={handleCommand}
