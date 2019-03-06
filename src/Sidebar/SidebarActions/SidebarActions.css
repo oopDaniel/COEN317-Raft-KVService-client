@@ -11,7 +11,6 @@
   padding: 0 20px;
   height: 60px;
   line-height: 60px;
-  box-sizing: border-box;
   color: #606266;
   font-size: 1.6rem;
   outline: none;
@@ -32,6 +31,12 @@
 
 ::-webkit-input-placeholder {
   color: #c0c4cc;
+}
+
+.buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .buttons .btn {

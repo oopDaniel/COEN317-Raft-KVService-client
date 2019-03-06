@@ -5,14 +5,24 @@ import './SidebarActions.css';
 function SidebarActions ({ onCommand }) {
   const [key, setKey] = useState('')
   const [value, setValue] = useState('')
+  const [isProcessingSet, setProcessingSet] = useState('')
+  const [isProcessingGet, setProcessingGet] = useState('')
 
-  const startCommand = (isRead) => () => {
+  const startCommand = (isRead) => async () => {
     setKey('')
     setValue('')
-    onCommand({
-      operation: isRead ? 'GET' : 'SET',
-      data: { key, value }
-    })
+    const processingFunc = isRead ? setProcessingGet : setProcessingSet
+    processingFunc(true)
+    try {
+      await onCommand({
+        operation: isRead ? 'GET' : 'SET',
+        data: { key, value }
+      })
+    } catch (e) {
+      console.log('Error submitting command', e)
+    } finally {
+      processingFunc(false)
+    }
   }
 
   return (
@@ -38,10 +48,12 @@ function SidebarActions ({ onCommand }) {
       <section className="buttons">
         <Btn
           disabled={key === ''}
+          processing={isProcessingSet}
           onClick={startCommand(false)}
         >Set</Btn>
         <Btn
           disabled={key === ''}
+          processing={isProcessingGet}
           onClick={startCommand(true)}
         >Get</Btn>
       </section>

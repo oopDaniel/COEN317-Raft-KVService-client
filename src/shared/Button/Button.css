@@ -1,8 +1,9 @@
 .btn {
   display: inline-block;
-  padding: .8rem;
+  padding: .8rem 2rem;
   min-width: 96px;
   max-width: 120px;
+  min-height: 52px;
   color: white;
   background-color: rgb(95, 204, 204);
   box-shadow: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
@@ -22,6 +23,39 @@
   cursor: default;
 }
 
+.btn.processing {
+  background-color: var(--selected);
+}
+
 .btn:hover:not(.disabled):not(.active) {
   background-color: var(--hover);
+}
+
+.spinner-wrapper {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+.spinner-wrapper::after {
+  position: absolute;
+  bottom: 0;
+  text-align: center;
+}
+
+.spinner {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-top: 2px solid var(--hover);
+  border-right: 2px solid transparent;
+  border-radius: 50%;
+  animation: rotation .8s linear infinite;
+}
+
+@keyframes rotation{
+  from{
+    transform: rotate(0deg);
+  }
+  to{
+    transform: rotate(360deg);
+  }
 }

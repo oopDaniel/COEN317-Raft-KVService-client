@@ -18,7 +18,7 @@ function Sidebar ({ selectedMachine, customClass, commands, appendCommand }) {
   }
 
   const handleCommand = (newCommand) => {
-    // TODO: call API
+    // TODO: call API and return it as promiss
     appendCommand(newCommand)
   }
 

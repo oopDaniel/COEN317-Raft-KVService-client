@@ -7,15 +7,25 @@ function Button ({
   onClick = noop,
   children = 'Click me',
   disabled = false,
-  active = false
+  active = false,
+  processing = false
 }) {
-
+  let btnClassName = 'btn '
+  if (customClass) btnClassName += customClass
+  if (disabled) btnClassName += ' disabled'
+  if (active) btnClassName += ' active'
+  if (processing) btnClassName += ' processing'
   return (
     <span
-      className={`btn ${customClass} ${disabled ? 'disabled': ''} ${active ? 'active' : ''}`}
+      className={btnClassName.trim()}
       onClick={disabled ? noop : onClick}
     >
-      { children }
+      { processing
+        ? <span className="spinner-wrapper">
+            <span className="spinner"></span>&nbsp;
+        </span>
+        : children
+      }
     </span>
   );
 }
