@@ -1,25 +1,30 @@
 import React, { useState, useEffect, useContext } from 'react';
 import Axios from 'axios';
 import { FaDatabase } from 'react-icons/fa';
-import SelectionContext from '../shared/context/SelectionContext'
+import MachineContext from '../shared/context/MachineContext'
 import { KNOWN_SERVER_IP } from '../shared/constants'
 import logo from './logo.svg';
 import './Machines.css';
 
 function Machines (props) {
+  const { selected, select, unselect, loadAlive } = useContext(MachineContext)
+  const selectMachine = (id) => {
+    if (id === selected) unselect()
+    else select(id)
+  }
+
   const [machines, setMachines] = useState([])
 
   const fetchMachines = async () => {
     const {data} = await Axios.get(`http://${KNOWN_SERVER_IP}/machines/all`);
     setMachines(data);
   }
-  useEffect(() => { fetchMachines() }, []);
-
-  const { selected, select, unselect } = useContext(SelectionContext)
-  const selectMachine = (id) => {
-    if (id === selected) unselect()
-    else select(id)
+  const fetchAliveMachines = async () => {
+    const { data } = await Axios.get(`http://${KNOWN_SERVER_IP}/machines/alive`);
+    loadAlive(data.reduce((map, m) => (map[m] = true) && map, {}))
   }
+  useEffect(() => { fetchMachines() }, []);
+  useEffect(() => { fetchAliveMachines() }, []);
 
   return (
     <div className={`machines ${props.customClass}`}>

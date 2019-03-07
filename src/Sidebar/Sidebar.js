@@ -2,15 +2,16 @@ import React, { useState, useEffect, useContext } from 'react';
 import SidebarLogs from './SidebarLogs/SidebarLogs'
 import SidebarActions from './SidebarActions/SidebarActions'
 import Btn from '../shared/Button/Button'
-import SelectionContext from '../shared/context/SelectionContext'
+import MachineContext from '../shared/context/MachineContext'
 import NotificationContext from '../shared/context/NotificationContext'
 import { FaHeart, FaSkull, FaPowerOff } from 'react-icons/fa';
 import './Sidebar.css';
 
 function Sidebar ({ customClass }) {
   // Selected a machine
-  const { selected } = useContext(SelectionContext)
+  const { selected, isAlive: isAliveFunc, toggleMachine } = useContext(MachineContext)
   const hasSelected = selected !== null
+  const isAlive = hasSelected && isAliveFunc(selected)
 
   // Is showing logs or actions
   const [isLogs, setIsLogs] = useState(true)
@@ -26,13 +27,17 @@ function Sidebar ({ customClass }) {
   // Open or close notification
   const { open, close } = useContext(NotificationContext)
   // Status of selected machine. Is it alive?
-  const [isAlive, setIsAlive] = useState(true) // TODO: use status from server
+  // const [isAlive, setIsAlive] = useState(true) // TODO: use status from server
   const handlePowerBtn = () => {
+    if (!selected) return
+
     const hint = isAlive ? `Closing <${selected}>` : `Re-opening <${selected}>`
     const postHint = isAlive ? `Closed` : `Opened`
     open(hint)
-    setIsAlive(!isAlive)
-    // TODO: call API
+
+    // TODO: call API here, then toggleMachine
+    toggleMachine(selected)
+
     setTimeout(() => open(postHint), 3000)
   }
 

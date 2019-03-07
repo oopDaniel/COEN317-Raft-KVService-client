@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import style from './App.css';
 import Machines from './Machines/Machines'
 import Sidebar from './Sidebar/Sidebar'
-import { SelectionProvider } from './shared/context/SelectionContext'
+import { MachineProvider } from './shared/context/MachineContext'
 import { NotificationProvider } from './shared/context/NotificationContext'
 import Notification from './shared/Notification/Notification'
 
@@ -11,10 +11,10 @@ class App extends Component {
     return (
       <div className="App">
         <NotificationProvider>
-          <SelectionProvider>
+          <MachineProvider>
             <Machines customClass={style.machine} />
             <Sidebar customClass={style.sidebar} />
-          </SelectionProvider>
+          </MachineProvider>
           <Notification />
         </NotificationProvider>
       </div>
