@@ -31,14 +31,16 @@ function Sidebar ({ customClass }) {
   const handlePowerBtn = async () => {
     if (!selected) return
 
-    let hint = `Closing <${selected}>`
-    let postHint = 'Closed'
-    let callApi = del
+    let hint = `Re-opening <${selected}>`
+    let postHint = 'Opened'
+    let callApi = post
 
-    if (!isAlive) {
-      hint = `Re-opening <${selected}>`
-      postHint = 'Opened'
-      callApi = post
+    // Setting machine to off
+    if (isAlive) {
+      hint = `Closing <${selected}>`
+      postHint = 'Closed'
+      callApi = del
+      setIsLogs(true) // Submit command on disconnected machine is forbidden
     }
 
     open(hint)
@@ -81,7 +83,7 @@ function Sidebar ({ customClass }) {
           customClass={`sidebar-option flex-center`}
           active={!isLogs}
           onClick={() => handleBtnClick(false)}
-          disabled={!hasSelected}
+          disabled={!hasSelected || !isAlive}
         >
           Actions
         </Btn>
@@ -92,9 +94,11 @@ function Sidebar ({ customClass }) {
           { renderTitle(hasSelected) }
         </div>
         {
+          // TODO: use logs from individual machines
           isLogs
             ? <SidebarLogs
               logs={commands}
+              available={isAlive}
               hideFooter={hasSelected}
             />
             : <SidebarActions
@@ -115,7 +119,7 @@ function Sidebar ({ customClass }) {
                   )
                   : (
                     <div>
-                      <span className="status-text">Unreachable</span>
+                      <span className="status-text">Dead</span>
                       <FaSkull />
                     </div>
                   )

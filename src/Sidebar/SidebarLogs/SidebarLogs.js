@@ -1,11 +1,11 @@
 import React from 'react';
 import './SidebarLogs.css';
 
-function SidebarLogs ({ logs, hideFooter }) {
+function SidebarLogs ({ logs, hideFooter, available = true }) {
   return (
     <div className={`sidebar-logs ${hideFooter ? 'hide-footer' : '' }`}>
       {
-        logs.length
+        logs.length && available
           ? logs.map((log, index) => {
               if (log.operation === 'GET') {
                 return (
@@ -31,7 +31,7 @@ function SidebarLogs ({ logs, hideFooter }) {
                 )
               }
             })
-          : <div>No available logs</div>
+          : <div className="unavailable">No available logs</div>
       }
     </div>
   );

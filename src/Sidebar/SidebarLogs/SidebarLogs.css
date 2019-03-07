@@ -51,3 +51,8 @@
   padding-left: 1rem;
   text-align: left;
 }
+
+.unavailable {
+  text-decoration: underline;
+  font-style: italic;
+}
