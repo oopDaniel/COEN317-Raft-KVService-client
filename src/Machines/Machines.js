@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import Axios from 'axios';
-import { KNOWN_SERVER_IP } from '../shared/constants'
 import { FaDatabase } from 'react-icons/fa';
+import SelectionContext from '../shared/context/SelectionContext'
+import { KNOWN_SERVER_IP } from '../shared/constants'
 import logo from './logo.svg';
 import './Machines.css';
 
@@ -12,8 +13,13 @@ function Machines (props) {
     const {data} = await Axios.get(`http://${KNOWN_SERVER_IP}/machines/all`);
     setMachines(data);
   }
-
   useEffect(() => { fetchMachines() }, []);
+
+  const { selected, select, unselect } = useContext(SelectionContext)
+  const selectMachine = (id) => {
+    if (id === selected) unselect()
+    else select(id)
+  }
 
   return (
     <div className={`machines ${props.customClass}`}>
@@ -24,9 +30,9 @@ function Machines (props) {
             <div
               className="machine-container flex-center"
               key={id}
-              onClick={() => props.selectMachine(id)}
+              onClick={() => selectMachine(id)}
             >
-              <div className={`machine ${props.selectedMachine === id ? 'selected' : ''}`}>
+              <div className={`machine ${selected === id ? 'selected' : ''}`}>
                 <FaDatabase/>
                 {id}
               </div>

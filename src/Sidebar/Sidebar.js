@@ -1,15 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import SidebarLogs from './SidebarLogs/SidebarLogs'
 import SidebarActions from './SidebarActions/SidebarActions'
 import Btn from '../shared/Button/Button'
+import SelectionContext from '../shared/context/SelectionContext'
 import { FaHeart, FaSkull, FaPowerOff } from 'react-icons/fa';
 import './Sidebar.css';
 
-function Sidebar ({ selectedMachine, customClass, commands, appendCommand }) {
-  const hasSelected = selectedMachine !== null
-  const [isLogs, setIsLogs] = useState(true)
-  const [isAlive, setIsAlive] = useState(true) // TODO: use status from server
+function Sidebar ({ customClass }) {
+  // Selected a machine
+  const { selected } = useContext(SelectionContext)
+  const hasSelected = selected !== null
 
+  // Is showing logs or actions
+  const [isLogs, setIsLogs] = useState(true)
   useEffect(() => {
     if (!hasSelected) setIsLogs(true)
   }, [hasSelected])
@@ -19,19 +22,23 @@ function Sidebar ({ selectedMachine, customClass, commands, appendCommand }) {
     setIsLogs(isClickingLogs)
   }
 
-  const handleCommand = (newCommand) => {
-    newCommand.server = selectedMachine
-    // TODO: call API and return it as promiss
-    appendCommand(newCommand)
-  }
-
+  // Status of selected machine. Is it alive?
+  const [isAlive, setIsAlive] = useState(true) // TODO: use status from server
   // TODO: call API
   const handlePowerBtn = () => {
     setIsAlive(!isAlive)
   }
 
+  // Submit command to selected machine. Also, trace all commands for client side.
+  const [commands, setCommands] = useState([])
+  const handleCommand = (newCommand) => {
+    newCommand.server = selected
+    setCommands([...commands, newCommand])
+    // TODO: call API and return it as promise
+  }
+
   const renderTitle = (hasSelected) => {
-    if (hasSelected) return `${isLogs ? 'Logs' : 'Actions'} on Machine <${selectedMachine}>`
+    if (hasSelected) return `${isLogs ? 'Logs' : 'Actions'} on Machine <${selected}>`
     return 'Client Log History'
   }
 
