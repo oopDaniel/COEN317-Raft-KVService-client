@@ -3,7 +3,7 @@ import React, { Component } from 'react';
 const NotificationContext = React.createContext();
 
 const DEFAULT_TEXT = 'Processing...'
-const OPEN_DURATION = 5000
+const OPEN_DURATION = 4000
 export class NotificationProvider extends Component {
   state = {
     opened: false,
