@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
-import Axios from 'axios';
+import { get } from '../shared/api';
 import { FaDatabase } from 'react-icons/fa';
 import MachineContext from '../shared/context/MachineContext'
-import { KNOWN_SERVER_IP } from '../shared/constants'
 import logo from './logo.svg';
 import './Machines.css';
 
@@ -16,11 +15,11 @@ function Machines (props) {
   const [machines, setMachines] = useState([])
 
   const fetchMachines = async () => {
-    const {data} = await Axios.get(`http://${KNOWN_SERVER_IP}/machines/all`);
+    const data = await get('/machines/all');
     setMachines(data);
   }
   const fetchAliveMachines = async () => {
-    const { data } = await Axios.get(`http://${KNOWN_SERVER_IP}/machines/alive`);
+    const data = await get('/machines/alive');
     loadAlive(data.reduce((map, m) => (map[m] = true) && map, {}))
   }
   useEffect(() => { fetchMachines() }, []);
