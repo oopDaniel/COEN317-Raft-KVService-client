@@ -1,4 +1,5 @@
 .machine-container {
+  position: relative;
   flex: 1;
   margin: 0 1rem;
   font-size: 2rem;
@@ -22,5 +23,21 @@
 }
 .machine.dead {
   color: grey;
+}
+
+.machine-id {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, 140%);
+}
+
+.timer-container {
+  position: absolute;
+  left: -16px;
+  top: -30px;
+}
+
+.timer {
 }
 
