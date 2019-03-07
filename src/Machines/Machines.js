@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { get } from '../shared/api';
-import { FaDatabase } from 'react-icons/fa';
+import Machine from './Machine'
 import MachineContext from '../shared/context/MachineContext'
 import logo from './logo.svg';
 import './Machines.css';
@@ -30,18 +30,15 @@ function Machines (props) {
       <img src={logo} className="app-logo" alt="logo" />
       <div className="machine-list">
         {
-          machines.map(id =>
-            <div
-              className="machine-container flex-center"
+          machines.map(id => (
+            <Machine
+              id={id}
               key={id}
               onClick={() => selectMachine(id)}
-            >
-              <div className={`machine ${selected === id ? 'selected' : ''} ${isAlive(id) ? '' : 'dead'}`}>
-                <FaDatabase/>
-                {id}
-              </div>
-            </div>
-          )
+              isSelected={selected === id}
+              isAlive={isAlive(id)}
+            ></Machine>
+          ))
         }
       </div>
 

@@ -1,0 +1,26 @@
+.machine-container {
+  flex: 1;
+  margin: 0 1rem;
+  font-size: 2rem;
+}
+
+.machine {
+  display: flex;
+  flex-direction: column;
+  transition: color .3s;
+  cursor: pointer;
+  color: var(--black);
+}
+.machine svg {
+  font-size: 2em;
+}
+.machine:hover {
+  color: var(--hover);
+}
+.machine.selected {
+  color: var(--selected);
+}
+.machine.dead {
+  color: grey;
+}
+
