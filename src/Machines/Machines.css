@@ -25,6 +25,9 @@
 .machine.selected {
   color: var(--selected);
 }
+.machine.dead {
+  color: grey;
+}
 
 
 .app-logo {

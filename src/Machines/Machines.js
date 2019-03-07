@@ -6,7 +6,7 @@ import logo from './logo.svg';
 import './Machines.css';
 
 function Machines (props) {
-  const { selected, select, unselect, loadAlive } = useContext(MachineContext)
+  const { selected, select, unselect, loadAlive, isAlive } = useContext(MachineContext)
   const selectMachine = (id) => {
     if (id === selected) unselect()
     else select(id)
@@ -36,7 +36,7 @@ function Machines (props) {
               key={id}
               onClick={() => selectMachine(id)}
             >
-              <div className={`machine ${selected === id ? 'selected' : ''}`}>
+              <div className={`machine ${selected === id ? 'selected' : ''} ${isAlive(id) ? '' : 'dead'}`}>
                 <FaDatabase/>
                 {id}
               </div>
