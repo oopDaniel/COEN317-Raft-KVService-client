@@ -1,0 +1,25 @@
+.notification {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  min-width: 300px;
+  height: 64px;
+  font-size: 1.5em;
+  background: var(--black);
+  color: #fff;
+  border-radius: 4px;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
+  z-index: 500;
+  transition: transform .3s;
+  transform: translateY(100px); /* hidden by default */
+  opacity: 0;
+}
+
+.notification.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.notification:hover {
+  box-shadow: 0 14px 28px rgba(0,0,0,0.25), 0 10px 10px rgba(0,0,0,0.22);
+}

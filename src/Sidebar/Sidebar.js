@@ -3,6 +3,7 @@ import SidebarLogs from './SidebarLogs/SidebarLogs'
 import SidebarActions from './SidebarActions/SidebarActions'
 import Btn from '../shared/Button/Button'
 import SelectionContext from '../shared/context/SelectionContext'
+import NotificationContext from '../shared/context/NotificationContext'
 import { FaHeart, FaSkull, FaPowerOff } from 'react-icons/fa';
 import './Sidebar.css';
 
@@ -22,11 +23,17 @@ function Sidebar ({ customClass }) {
     setIsLogs(isClickingLogs)
   }
 
+  // Open or close notification
+  const { open, close } = useContext(NotificationContext)
   // Status of selected machine. Is it alive?
   const [isAlive, setIsAlive] = useState(true) // TODO: use status from server
-  // TODO: call API
   const handlePowerBtn = () => {
+    const hint = isAlive ? `Closing <${selected}>` : `Re-opening <${selected}>`
+    const postHint = isAlive ? `Closed` : `Opened`
+    open(hint)
     setIsAlive(!isAlive)
+    // TODO: call API
+    setTimeout(() => open(postHint), 3000)
   }
 
   // Submit command to selected machine. Also, trace all commands for client side.
