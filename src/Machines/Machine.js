@@ -39,14 +39,16 @@ function Machine ({ id, isSelected, isAlive, onClick }) {
   }
   return (
     <div
-      className="machine-container flex-center"
+      className="machine-container"
       onClick={onClick}
     >
       <div className={`machine machine-${id} ${isSelected ? 'selected' : ''} ${isAlive ? '' : 'dead'}`}>
         <div className="timer-container">
           <svg className="timer" width="160" height="120"></svg>
         </div>
-        <FaDatabase/>
+        <div className="db-container">
+          <FaDatabase/>
+        </div>
         <span className="machine-id">{id}</span>
       </div>
     </div>

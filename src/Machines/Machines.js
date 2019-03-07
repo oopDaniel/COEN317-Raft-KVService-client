@@ -2,8 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { get } from '../shared/api';
 import Machine from './Machine'
 import MachineContext from '../shared/context/MachineContext'
-import logo from './logo.svg';
-import './Machines.css';
+import './Machines.scss';
 
 function Machines (props) {
   const { selected, select, unselect, loadAlive, isAlive } = useContext(MachineContext)
@@ -27,7 +26,6 @@ function Machines (props) {
 
   return (
     <div className={`machines ${props.customClass}`}>
-      <img src={logo} className="app-logo" alt="logo" />
       <div className="machine-list">
         {
           machines.map(id => (
@@ -41,7 +39,6 @@ function Machines (props) {
           ))
         }
       </div>
-
     </div>
   );
 }

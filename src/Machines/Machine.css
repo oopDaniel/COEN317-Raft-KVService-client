@@ -1,11 +1,9 @@
 .machine-container {
-  position: relative;
-  flex: 1;
-  margin: 0 1rem;
   font-size: 2rem;
 }
 
 .machine {
+  position: relative;
   display: flex;
   flex-direction: column;
   transition: color .3s;
@@ -29,15 +27,19 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, 140%);
+  transform: translate(-50%, 300%);
 }
 
+.db-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, 40%);
+}
 .timer-container {
   position: absolute;
-  left: -16px;
-  top: -30px;
-}
-
-.timer {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, 0%);
 }
 
