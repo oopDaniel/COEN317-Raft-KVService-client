@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { post, del } from '../shared/api';
 import SidebarLogs from './SidebarLogs/SidebarLogs'
 import SidebarActions from './SidebarActions/SidebarActions'
 import Btn from '../shared/Button/Button'
@@ -8,7 +9,7 @@ import { FaHeart, FaSkull, FaPowerOff } from 'react-icons/fa';
 import './Sidebar.css';
 
 function Sidebar ({ customClass }) {
-  // Selected a machine
+  // Machine related logic: selection and status check
   const { selected, isAlive: isAliveFunc, toggleMachine } = useContext(MachineContext)
   const hasSelected = selected !== null
   const isAlive = hasSelected && isAliveFunc(selected)
@@ -24,21 +25,31 @@ function Sidebar ({ customClass }) {
     setIsLogs(isClickingLogs)
   }
 
-  // Open or close notification
-  const { open, close } = useContext(NotificationContext)
-  // Status of selected machine. Is it alive?
-  // const [isAlive, setIsAlive] = useState(true) // TODO: use status from server
-  const handlePowerBtn = () => {
+  // Open notification
+  const { open } = useContext(NotificationContext)
+
+  const handlePowerBtn = async () => {
     if (!selected) return
 
-    const hint = isAlive ? `Closing <${selected}>` : `Re-opening <${selected}>`
-    const postHint = isAlive ? `Closed` : `Opened`
+    let hint = `Closing <${selected}>`
+    let postHint = 'Closed'
+    let callApi = del
+
+    if (!isAlive) {
+      hint = `Re-opening <${selected}>`
+      postHint = 'Opened'
+      callApi = post
+    }
+
     open(hint)
-
-    // TODO: call API here, then toggleMachine
-    toggleMachine(selected)
-
-    setTimeout(() => open(postHint), 3000)
+    try {
+      await callApi(`/machine/${selected}`);
+      toggleMachine(selected)
+      open(postHint)
+    } catch (e) {
+      console.log(e)
+      open('<Error> Unable to toggle machine.')
+    }
   }
 
   // Submit command to selected machine. Also, trace all commands for client side.
