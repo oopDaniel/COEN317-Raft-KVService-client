@@ -9,10 +9,12 @@ const arc = d3.arc()
     .outerRadius(56)
     .startAngle(0);
 
-function Machine ({ id, isSelected, isAlive, onClick }) {
+function Machine ({ id, isSelected, isAlive: isAliveFunc, onClick }) {
   useEffect(() => {
     renderChart()
   }, [])
+
+  const isAlive = isAliveFunc(id)
 
   function renderChart () {
     const svg = d3.select(`.machine-${id} svg.timer`)
@@ -32,9 +34,11 @@ function Machine ({ id, isSelected, isAlive, onClick }) {
     .attr('d', arc);
 
     d3.interval(() => {
+      // Use isAliveFunc because d3 will not get the state update from React
+      const roll = isAliveFunc(id) ? Math.random() : 0
       foreground.transition()
           .duration(1000)
-          .attrTween("d", arcTween(Math.random() * PI_2));
+          .attrTween("d", arcTween(roll * PI_2));
     }, 1000);
   }
   return (

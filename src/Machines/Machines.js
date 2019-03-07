@@ -34,7 +34,7 @@ function Machines (props) {
               key={id}
               onClick={() => selectMachine(id)}
               isSelected={selected === id}
-              isAlive={isAlive(id)}
+              isAlive={isAlive}
             ></Machine>
           ))
         }

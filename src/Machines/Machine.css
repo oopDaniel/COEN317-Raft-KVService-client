@@ -20,7 +20,7 @@
   color: var(--selected);
 }
 .machine.dead {
-  color: grey;
+  color: lightgrey;
 }
 
 .machine-id {
