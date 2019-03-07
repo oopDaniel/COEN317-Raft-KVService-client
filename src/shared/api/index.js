@@ -1,6 +1,8 @@
 import Axios from 'axios'
 import {KNOWN_SERVER_IP} from '../constants'
 
+// TODO: dynamic IP
+
 const instance = Axios.create({
   baseURL: `http://${KNOWN_SERVER_IP}`
 });

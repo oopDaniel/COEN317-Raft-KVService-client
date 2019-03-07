@@ -28,6 +28,9 @@
   outline: none;
   border-color: #409eff;
 }
+.input.highlight {
+  color: var(--red);
+}
 
 ::-webkit-input-placeholder {
   color: #c0c4cc;

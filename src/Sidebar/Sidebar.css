@@ -42,7 +42,7 @@
   transform: scale(1.4);
 }
 .alive .status-container svg {
-  color: #fe6c6f;
+  color: var(--red);
   animation: beat .4s ease infinite alternate;
 	transform-origin: center;
 }

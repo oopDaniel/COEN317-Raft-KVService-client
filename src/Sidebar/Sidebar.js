@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { post, del } from '../shared/api';
+import { get, post, del } from '../shared/api';
 import SidebarLogs from './SidebarLogs/SidebarLogs'
 import SidebarActions from './SidebarActions/SidebarActions'
 import Btn from '../shared/Button/Button'
@@ -57,7 +57,9 @@ function Sidebar ({ customClass }) {
   const handleCommand = (newCommand) => {
     newCommand.server = selected
     setCommands([...commands, newCommand])
-    // TODO: call API and return it as promise
+    return newCommand.operation === 'GET'
+      ? get(`/state?key=${newCommand.data.key}`)
+      : post('/state', newCommand.data)
   }
 
   const renderTitle = (hasSelected) => {

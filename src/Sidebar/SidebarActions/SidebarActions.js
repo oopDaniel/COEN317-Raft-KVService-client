@@ -1,23 +1,38 @@
-import React, { useState }from 'react';
+import React, { useState, useContext }from 'react';
 import Btn from '../../shared/Button/Button'
+import NotificationContext from '../../shared/context/NotificationContext'
 import './SidebarActions.css';
 
 function SidebarActions ({ onCommand }) {
   const [key, setKey] = useState('')
   const [value, setValue] = useState('')
+  const [fetchedFromRead, setFetchedFromRead] = useState(false)
   const [isProcessingSet, setProcessingSet] = useState('')
   const [isProcessingGet, setProcessingGet] = useState('')
 
+  const { open } = useContext(NotificationContext)
+
   const startCommand = (isRead) => async () => {
-    setKey('')
-    setValue('')
+    // Clean up for 'Set'
+    if (!isRead) {
+      setKey('')
+      setValue('')
+    }
+
     const processingFunc = isRead ? setProcessingGet : setProcessingSet
     processingFunc(true)
     try {
-      await onCommand({
+      const res = await onCommand({
         operation: isRead ? 'GET' : 'SET',
         data: { key, value }
       })
+      if (isRead) {
+        setValue(res.Value)
+        setFetchedFromRead(true)
+      } else {
+        setFetchedFromRead(false)
+      }
+      open('Command Submitted')
     } catch (e) {
       console.log('Error submitting command', e)
     } finally {
@@ -37,10 +52,11 @@ function SidebarActions ({ onCommand }) {
           />
 
         <input
-          className="input"
+          className={`input ${fetchedFromRead ? 'highlight' : ''}`}
           placeholder="Value"
           type="text"
           value={value}
+          onFocus={() => setFetchedFromRead(false)}
           onChange={e => setValue(e.target.value)}
         />
       </section>
