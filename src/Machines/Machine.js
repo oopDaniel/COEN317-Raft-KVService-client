@@ -1,8 +1,12 @@
-import React, { useEffect, useRef, useContext } from 'react';
+import React, { useEffect, useRef, useContext, useState } from 'react';
 import { FaDatabase } from 'react-icons/fa';
 import * as d3 from 'd3'
 import MachineContext from '../shared/context/MachineContext'
+import { ELECTION_TIMEOUT } from '../shared/constants'
 import './Machine.css';
+
+const DONUT_UPDATE_INTERVAL = 1000
+const PORTION_PER_SEC = DONUT_UPDATE_INTERVAL / ELECTION_TIMEOUT
 
 const PI_2 = 2 * Math.PI
 const arc = d3.arc()
@@ -18,7 +22,8 @@ function Machine ({ id }) {
     unselect,
     isAlive: isAliveFunc,
     appendPosition,
-    leader
+    leader,
+    heartbeatSignal
   } = useContext(MachineContext)
   const isSelected = selected === id
   const isAlive = isAliveFunc(id)
@@ -28,7 +33,11 @@ function Machine ({ id }) {
   }
 
   const dbIconRef = useRef(null)
+
+  const [foregroundDonut, setForegroundDonut] = useState(null)
+  const [d3Interval, setD3Interval] = useState(null)
   useEffect(() => { renderChart() }, [leader])
+  useEffect(() => { updateChart() }, [leader, heartbeatSignal])
 
   // Store the position to context, so msg can use it
   useEffect(() => {
@@ -37,6 +46,7 @@ function Machine ({ id }) {
   }, [])
 
   function renderChart () {
+    if (!leader) return
     // Donut timer
     const svg = d3.select(`.machine-${id} svg.timer`)
     const width = Number(svg.attr('width'))
@@ -49,19 +59,46 @@ function Machine ({ id }) {
       .style('fill', '#ddd')
       .attr('d', arc);
 
-    const foreground = g.append('path')
+    const donut = g.append('path')
       .datum({ endAngle: 0 })
       .style('fill', 'var(--timeout-track)')
-      .attr('d', arc);
+      .attr('d', arc)
 
-    d3.interval(() => {
-      // Use isAliveFunc because d3 will not get the state update from React
-      const roll = isAliveFunc(id) && leader !== id ? Math.random() : 0
-      foreground.transition()
-        .duration(1000)
-        .attrTween('d', arcTween(roll * PI_2));
-    }, 1000);
+    setForegroundDonut(donut)
+    updateChart(donut)
   }
+
+  function updateChart (donut) {
+    donut = foregroundDonut || donut
+    if (!donut) return
+
+    // cleanup old interval
+    if (d3Interval) {
+      d3Interval.stop()
+      setD3Interval(null)
+    }
+
+    // Use isAliveFunc because d3 will not get the state update from React
+    const mustHideTimer = leader === id || !isAliveFunc(id)
+
+    // Start from a full donut
+    let radio = 1
+    if (!mustHideTimer) {
+      donut.transition()
+        .duration(500)
+        .attrTween('d', arcTween(radio * PI_2))
+
+      setD3Interval(
+        d3.interval(() => {
+          radio = Math.max(0, radio - PORTION_PER_SEC)
+          donut.transition()
+            .duration(1000)
+            .attrTween('d', arcTween(radio * PI_2))
+          }, 500)
+      )
+    }
+  }
+
   return (
     <div
       className="machine-container"

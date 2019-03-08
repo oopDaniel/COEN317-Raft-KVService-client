@@ -5,7 +5,7 @@ import { HEARTBEAT_INTERVAL, MSG_SINGLE_TRIP_TIME } from '../../shared/constants
 import './MessageMap.css';
 
 function MessageMap () {
-  const { positions, leader, alive } = useContext(MachineContext)
+  const { positions, leader, alive, sendHeartbeat } = useContext(MachineContext)
   useEffect(() => {
     if (!positions || positions.length === 0) return
     renderChart(positions)
@@ -38,6 +38,7 @@ function MessageMap () {
         .transition()
         .style('fill', 'var(--msg-ack')
         .duration(0)
+        .on('end', sendHeartbeat)
         .transition()
         .duration(MSG_SINGLE_TRIP_TIME)
         .attr('cx', leaderX)

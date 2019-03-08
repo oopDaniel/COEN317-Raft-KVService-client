@@ -10,7 +10,8 @@ export class MachineProvider extends Component {
     alive: {},
     positions: [],
     leader: null,
-    candidate: {} // todo: different color to indicate election
+    candidate: {}, // todo: different color to indicate election
+    heartbeatSignal: false
   }
   render () {
     return (
@@ -20,6 +21,7 @@ export class MachineProvider extends Component {
         positions: this.state.positions,
         leader: this.state.leader,
         candidate: this.state.candidate,
+        heartbeatSignal: this.state.heartbeatSignal,
         select: machine => this.setState({ selected: machine }),
         unselect: () => this.setState({ selected: null }),
         loadAlive: alive => {
@@ -36,7 +38,8 @@ export class MachineProvider extends Component {
           // Workaround weird bug in setState for `position`
           positionCache.push({id, ...newPos})
           this.setState({ positions: [...positionCache] })
-        }
+        },
+        sendHeartbeat: () => this.setState({ heartbeatSignal: !this.state.heartbeatSignal })
       }}>
         { this.props.children }
       </MachineContext.Provider>
