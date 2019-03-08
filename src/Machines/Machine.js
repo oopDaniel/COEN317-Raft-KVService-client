@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useContext } from 'react';
 import { FaDatabase } from 'react-icons/fa';
 import * as d3 from 'd3'
+import MachineContext from '../shared/context/MachineContext'
 import './Machine.css';
 
 const PI_2 = 2 * Math.PI
@@ -9,48 +10,68 @@ const arc = d3.arc()
     .outerRadius(56)
     .startAngle(0);
 
-function Machine ({ id, isSelected, isAlive: isAliveFunc, onClick }) {
+function Machine ({ id }) {
+  // Machine state related
+  const {
+    selected,
+    select,
+    unselect,
+    isAlive: isAliveFunc,
+    appendPosition,
+    leader
+  } = useContext(MachineContext)
+  const isSelected = selected === id
+  const isAlive = isAliveFunc(id)
+  const selectMachine = () => {
+    if (id === selected) unselect()
+    else select(id)
+  }
+
+  const dbIconRef = useRef(null)
+  useEffect(() => { renderChart() }, [leader])
+
+  // Store the position to context, so msg can use it
   useEffect(() => {
-    renderChart()
+    const pos = getIconPosition(dbIconRef.current)
+    appendPosition(id, pos)
   }, [])
 
-  const isAlive = isAliveFunc(id)
-
   function renderChart () {
+    // Donut timer
     const svg = d3.select(`.machine-${id} svg.timer`)
     const width = Number(svg.attr('width'))
     const height = Number(svg.attr('height'))
     const g = svg.append('g').attr('transform', `translate(${width / 2}, ${height / 2})`)
 
-    // Donut background
+    // Background color of donut timer
     g.append('path')
-    .datum({ endAngle: PI_2 })
-    .style('fill', '#ddd')
-    .attr('d', arc);
+      .datum({ endAngle: PI_2 })
+      .style('fill', '#ddd')
+      .attr('d', arc);
 
-    const foreground = g.append("path")
-    .datum({ endAngle: 0 })
-    .style('fill', 'var(--timeout-track)')
-    .attr('d', arc);
+    const foreground = g.append('path')
+      .datum({ endAngle: 0 })
+      .style('fill', 'var(--timeout-track)')
+      .attr('d', arc);
 
     d3.interval(() => {
       // Use isAliveFunc because d3 will not get the state update from React
-      const roll = isAliveFunc(id) ? Math.random() : 0
+      const roll = isAliveFunc(id) && leader !== id ? Math.random() : 0
       foreground.transition()
-          .duration(1000)
-          .attrTween("d", arcTween(roll * PI_2));
+        .duration(1000)
+        .attrTween('d', arcTween(roll * PI_2));
     }, 1000);
   }
   return (
     <div
       className="machine-container"
-      onClick={onClick}
+      onClick={selectMachine}
     >
       <div className={`machine machine-${id} ${isSelected ? 'selected' : ''} ${isAlive ? '' : 'dead'}`}>
         <div className="timer-container">
           <svg className="timer" width="160" height="120"></svg>
         </div>
-        <div className="db-container">
+        <div className="db-container" ref={dbIconRef}>
           <FaDatabase/>
         </div>
         <span className="machine-id">{id}</span>
@@ -107,6 +128,13 @@ function arcTween(newAngle) {
       return arc(d);
     };
   };
+}
+
+function getIconPosition (el) {
+  let { width, height, x, y } = el.getBoundingClientRect()
+  x = ~~(x + width / 2)
+  y = ~~(y + height / 2)
+  return { x, y }
 }
 
 export default Machine;
