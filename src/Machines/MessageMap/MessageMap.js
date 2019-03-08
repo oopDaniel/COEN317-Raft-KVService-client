@@ -26,6 +26,7 @@ function MessageMap () {
 
     function heartbeat () {
       circleGroups
+        .filter(d => d.id !== leader)
         .attr('r', 10)
         .attr('cx', leaderX)
         .attr('cy', leaderY)
