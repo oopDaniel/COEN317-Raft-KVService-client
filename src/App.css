@@ -17,6 +17,9 @@
   --black: #282c34;
   --red: #fe6c6f;
   --timeout-track: mediumaquamarine;
+  --msg-heartbeat: #fe6c6f;
+  --msg-ack: mediumspringgreen;
+  --msg-rej: red;
   --action-bar-height: 96px;
 }
 

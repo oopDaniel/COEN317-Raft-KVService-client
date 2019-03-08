@@ -1,35 +1,51 @@
 import React, { useEffect, useContext } from 'react';
 import * as d3 from 'd3'
 import MachineContext from '../../shared/context/MachineContext'
+import { HEARTBEAT_INTERVAL, MSG_SINGLE_TRIP_TIME } from '../../shared/constants'
 import './MessageMap.css';
 
 function MessageMap () {
-  const { positions } = useContext(MachineContext)
+  const { positions, leader, alive } = useContext(MachineContext)
   useEffect(() => {
     if (!positions || positions.length === 0) return
     renderChart(positions)
-  }, [positions])
+  }, [positions, leader, alive])
 
 
   function renderChart (positions) {
-    // Message to others
+    const leaderPos = positions.find(p => p.id === leader)
+    if (!leaderPos) return
+
+    const { x: leaderX, y: leaderY } = leaderPos
     const msgSvg = d3.select('svg.msg-svg')
 
     const circleGroups = msgSvg.selectAll('.circleGroups')
       .data(positions)
       .enter()
+      .append('circle')
 
-    const circle = circleGroups.append('circle')
-      .attr('cx', d => d.x)
-      .attr('cy', d => d.y)
-      .attr('r', 10)
-      .style('fill', 'red');
+    function heartbeat () {
+      circleGroups
+        .attr('r', 10)
+        .attr('cx', leaderX)
+        .attr('cy', leaderY)
+        .style('fill', 'var(--msg-heartbeat)')
+        .transition().duration(MSG_SINGLE_TRIP_TIME)
+        .attr('cx', d => d.x)
+        .attr('cy', d => d.y)
+        .filter(d => alive[d.id])
+        .transition()
+        .style('fill', 'var(--msg-ack')
+        .duration(0)
+        .transition()
+        .duration(MSG_SINGLE_TRIP_TIME)
+        .attr('cx', leaderX)
+        .attr('cy', leaderY)
+    }
 
-    circle.on('mousedown', function () {
-      circle.transition()
-        .duration(1500)
-        .attr('cx', 500);
-    })
+    heartbeat()
+
+    d3.interval(heartbeat, HEARTBEAT_INTERVAL);
   }
 
   return (

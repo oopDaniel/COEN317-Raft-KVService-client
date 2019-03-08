@@ -8,8 +8,9 @@ export class MachineProvider extends Component {
   state = {
     selected: null,
     alive: {},
-    positions: {},
-    leader: null
+    positions: [],
+    leader: null,
+    candidate: {} // todo: different color to indicate election
   }
   render () {
     return (
@@ -18,6 +19,7 @@ export class MachineProvider extends Component {
         alive: this.state.alive,
         positions: this.state.positions,
         leader: this.state.leader,
+        candidate: this.state.candidate,
         select: machine => this.setState({ selected: machine }),
         unselect: () => this.setState({ selected: null }),
         loadAlive: alive => {
