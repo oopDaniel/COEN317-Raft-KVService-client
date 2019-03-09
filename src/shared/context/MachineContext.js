@@ -1,9 +1,11 @@
 import React, { Component } from 'react';
-
+import  { Subject } from 'rxjs'
+import { debounceTime } from 'rxjs/operators';
 const MachineContext = React.createContext();
 
 // Workaround bug in setState with `position`
 const positionCache = []
+
 export class MachineProvider extends Component {
   state = {
     selected: null,
@@ -11,8 +13,10 @@ export class MachineProvider extends Component {
     positions: [],
     leader: null,
     candidate: {}, // todo: different color to indicate election
-    heartbeatSignal: false
+    heartbeat$: new Subject(),
+    receivedHeartbeat$: new Subject()
   }
+
   render () {
     return (
       <MachineContext.Provider value={{
@@ -21,7 +25,8 @@ export class MachineProvider extends Component {
         positions: this.state.positions,
         leader: this.state.leader,
         candidate: this.state.candidate,
-        heartbeatSignal: this.state.heartbeatSignal,
+        heartbeat$: this.state.heartbeat$.pipe(debounceTime(50)),
+        receivedHeartbeat$: this.state.receivedHeartbeat$,
         select: machine => this.setState({ selected: machine }),
         unselect: () => this.setState({ selected: null }),
         loadAlive: alive => {
@@ -31,15 +36,40 @@ export class MachineProvider extends Component {
           this.setState({ alive, leader: ids[idx] })
         },
         isAlive: id => this.state.alive[id] === true,
-        toggleMachine: id => this.setState({
-          alive: {...this.state.alive, [id]: !this.state.alive[id] }
-        }),
+        toggleMachine: id => {
+          // mock leader re-election. TODO: use leader from server
+          const newState = !this.state.alive[id]
+          let newLeader = null
+
+          if (!newState && id === this.state.leader) {
+            const ids = Object.keys(this.state.alive)
+              .filter(aliveId => aliveId !== id)
+            const idx = ~~(Math.random() * ids.length)
+            newLeader = ids[idx]
+            setTimeout(() => this.setState({
+              leader: newLeader
+            }), 30000)
+          }
+
+          if (newLeader === null) {
+            this.setState({
+              alive: {...this.state.alive, [id]: newState }
+            })
+          } else {
+            this.setState({
+              alive: {...this.state.alive, [id]: newState },
+              leader: null
+            })
+          }
+
+        },
         appendPosition: (id, newPos) => {
           // Workaround weird bug in setState for `position`
           positionCache.push({id, ...newPos})
           this.setState({ positions: [...positionCache] })
         },
-        sendHeartbeat: () => this.setState({ heartbeatSignal: !this.state.heartbeatSignal })
+        notifySentHeartbeat: () => this.state.heartbeat$.next(Math.random()),
+        notifyReceivedHeartbeat: id => this.state.receivedHeartbeat$.next(id)
       }}>
         { this.props.children }
       </MachineContext.Provider>

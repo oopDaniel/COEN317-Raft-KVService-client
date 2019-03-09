@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useContext, useState } from 'react';
+import { useObservable } from 'rxjs-hooks';
 import { FaDatabase } from 'react-icons/fa';
 import * as d3 from 'd3'
 import MachineContext from '../shared/context/MachineContext'
@@ -7,7 +8,6 @@ import './Machine.css';
 
 const DONUT_UPDATE_INTERVAL = 1000
 const PORTION_PER_SEC = DONUT_UPDATE_INTERVAL / ELECTION_TIMEOUT
-
 const PI_2 = 2 * Math.PI
 const arc = d3.arc()
     .innerRadius(48)
@@ -23,7 +23,8 @@ function Machine ({ id }) {
     isAlive: isAliveFunc,
     appendPosition,
     leader,
-    heartbeatSignal
+    heartbeat$,
+    notifyReceivedHeartbeat
   } = useContext(MachineContext)
   const isSelected = selected === id
   const isAlive = isAliveFunc(id)
@@ -32,12 +33,16 @@ function Machine ({ id }) {
     else select(id)
   }
 
+  // Need Ref of db icon to locate the position of messages
   const dbIconRef = useRef(null)
 
-  const [foregroundDonut, setForegroundDonut] = useState(null)
+  const [timeoutDonut, setTimeoutDonut] = useState(null)
   const [d3Interval, setD3Interval] = useState(null)
-  useEffect(() => { renderChart() }, [leader])
-  useEffect(() => { updateChart() }, [leader, heartbeatSignal])
+  useEffect(() => { renderDonut() }, [leader])
+
+  // Reset timer (update donut) when received heartbeat
+  const receivedHeartbeat = useObservable(() => heartbeat$)
+  useEffect(() => { updateDonut() }, [receivedHeartbeat])
 
   // Store the position to context, so msg can use it
   useEffect(() => {
@@ -45,7 +50,7 @@ function Machine ({ id }) {
     appendPosition(id, pos)
   }, [])
 
-  function renderChart () {
+  function renderDonut () {
     if (!leader) return
     // Donut timer
     const svg = d3.select(`.machine-${id} svg.timer`)
@@ -64,12 +69,14 @@ function Machine ({ id }) {
       .style('fill', 'var(--timeout-track)')
       .attr('d', arc)
 
-    setForegroundDonut(donut)
-    updateChart(donut)
+    setTimeoutDonut(donut)
+    updateDonut(donut)
   }
 
-  function updateChart (donut) {
-    donut = foregroundDonut || donut
+  function updateDonut (donut) {
+    // Only the initialized call will pass donut instance to this function
+    const isFromHeartbeat = donut === undefined
+    donut = timeoutDonut || donut
     if (!donut) return
 
     // cleanup old interval
@@ -87,6 +94,7 @@ function Machine ({ id }) {
       donut.transition()
         .duration(500)
         .attrTween('d', arcTween(radio * PI_2))
+        .on('end', () => isFromHeartbeat && notifyReceivedHeartbeat(id))
 
       setD3Interval(
         d3.interval(() => {
