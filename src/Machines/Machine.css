@@ -42,4 +42,11 @@
   left: 50%;
   transform: translate(-50%, 0%);
 }
+.crown-container {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: scale(0.6, 0.6) rotate(40deg) translate(-15%, -60%);
+  color: orange;
+}
 

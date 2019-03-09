@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useContext, useState } from 'react';
 import { useObservable } from 'rxjs-hooks';
-import { FaDatabase } from 'react-icons/fa';
+import { FaDatabase, FaCrown } from 'react-icons/fa';
 import * as d3 from 'd3'
 import MachineContext from '../shared/context/MachineContext'
 import { ELECTION_TIMEOUT } from '../shared/constants'
 import './Machine.css';
 
-const DONUT_UPDATE_INTERVAL = 1000
+const DONUT_UPDATE_INTERVAL = 600
 const PORTION_PER_SEC = DONUT_UPDATE_INTERVAL / ELECTION_TIMEOUT
 const PI_2 = 2 * Math.PI
 const arc = d3.arc()
@@ -86,13 +86,13 @@ function Machine ({ id }) {
     }
 
     // Use isAliveFunc because d3 will not get the state update from React
-    const mustHideTimer = leader === id || !isAliveFunc(id)
+    const isTimerEnabled = leader !== id && isAliveFunc(id)
 
     // Start from a full donut
     let radio = 1
-    if (!mustHideTimer) {
+    if (isTimerEnabled) {
       donut.transition()
-        .duration(500)
+        .duration(300)
         .attrTween('d', arcTween(radio * PI_2))
         .on('end', () => isFromHeartbeat && notifyReceivedHeartbeat(id))
 
@@ -100,9 +100,9 @@ function Machine ({ id }) {
         d3.interval(() => {
           radio = Math.max(0, radio - PORTION_PER_SEC)
           donut.transition()
-            .duration(1000)
+            .duration(DONUT_UPDATE_INTERVAL)
             .attrTween('d', arcTween(radio * PI_2))
-          }, 500)
+          }, DONUT_UPDATE_INTERVAL)
       )
     }
   }
@@ -116,6 +116,13 @@ function Machine ({ id }) {
         <div className="timer-container">
           <svg className="timer" width="160" height="120"></svg>
         </div>
+        {
+          leader === id && (
+            <div className="crown-container">
+              <FaCrown/>
+            </div>
+          )
+        }
         <div className="db-container" ref={dbIconRef}>
           <FaDatabase/>
         </div>
