@@ -3,11 +3,10 @@ import { useObservable } from 'rxjs-hooks';
 import { FaDatabase, FaCrown } from 'react-icons/fa';
 import * as d3 from 'd3'
 import MachineContext from '../shared/context/MachineContext'
-import { ELECTION_TIMEOUT } from '../shared/constants'
+import { ELECTION_DURATION_MIN, ELECTION_DURATION_MAX } from '../shared/constants'
 import './Machine.css';
 
 const DONUT_UPDATE_INTERVAL = 600
-const PORTION_PER_SEC = DONUT_UPDATE_INTERVAL / ELECTION_TIMEOUT
 const PI_2 = 2 * Math.PI
 const arc = d3.arc()
     .innerRadius(48)
@@ -15,6 +14,8 @@ const arc = d3.arc()
     .startAngle(0);
 
 function Machine ({ id }) {
+  const ELECTION_TIMEOUT = Math.random() * (ELECTION_DURATION_MAX - ELECTION_DURATION_MIN) + ELECTION_DURATION_MIN
+  const PORTION_PER_SEC = DONUT_UPDATE_INTERVAL / ELECTION_TIMEOUT
   // Machine state related
   const {
     selected,
