@@ -1,6 +1,11 @@
 import React, { Component } from 'react';
-import  { Subject } from 'rxjs'
-import { debounceTime, bufferCount, map } from 'rxjs/operators';
+import  { Subject, BehaviorSubject } from 'rxjs'
+import {
+  debounceTime,
+  bufferCount,
+  map,
+  combineLatest
+} from 'rxjs/operators';
 
 const MachineContext = React.createContext();
 
@@ -12,7 +17,19 @@ export class MachineProvider extends Component {
     candidate: {}, // todo: different color to indicate election
     heartbeat$: new Subject(),
     receivedHeartbeat$: new Subject(),
-    positions$: new Subject()
+    positions$: new Subject(),
+    machineAlive1$: new BehaviorSubject(true),
+    machineAlive2$: new BehaviorSubject(true),
+    machineAlive3$: new BehaviorSubject(true),
+    machineAlive4$: new BehaviorSubject(true),
+    machineAlive5$: new BehaviorSubject(true),
+    // alive$: combineLatest(
+    //   this.state.machineAlive1$,
+    //   this.state.machineAlive2$,
+    //   this.state.machineAlive3$,
+    //   this.state.machineAlive4$,
+    //   this.state.machineAlive5$
+    // )
   }
 
   render () {
