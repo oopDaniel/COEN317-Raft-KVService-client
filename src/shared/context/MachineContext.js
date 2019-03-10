@@ -1,20 +1,18 @@
 import React, { Component } from 'react';
 import  { Subject } from 'rxjs'
-import { debounceTime } from 'rxjs/operators';
-const MachineContext = React.createContext();
+import { debounceTime, bufferCount, map } from 'rxjs/operators';
 
-// Workaround bug in setState with `position`
-const positionCache = []
+const MachineContext = React.createContext();
 
 export class MachineProvider extends Component {
   state = {
     selected: null,
     alive: {},
-    positions: [],
     leader: null,
     candidate: {}, // todo: different color to indicate election
     heartbeat$: new Subject(),
-    receivedHeartbeat$: new Subject()
+    receivedHeartbeat$: new Subject(),
+    positions$: new Subject()
   }
 
   render () {
@@ -22,7 +20,10 @@ export class MachineProvider extends Component {
       <MachineContext.Provider value={{
         selected: this.state.selected,
         alive: this.state.alive,
-        positions: this.state.positions,
+        positions$: this.state.positions$.pipe(
+          bufferCount(5),
+          map(pos => pos.reduce((map, pos) => (map[pos.id] = pos) && map, {}))
+        ),
         leader: this.state.leader,
         candidate: this.state.candidate,
         heartbeat$: this.state.heartbeat$.pipe(debounceTime(50)),
@@ -62,11 +63,6 @@ export class MachineProvider extends Component {
             })
           }
 
-        },
-        appendPosition: (id, newPos) => {
-          // Workaround weird bug in setState for `position`
-          positionCache.push({id, ...newPos})
-          this.setState({ positions: [...positionCache] })
         },
         notifySentHeartbeat: () => this.state.heartbeat$.next(Math.random()),
         notifyReceivedHeartbeat: id => this.state.receivedHeartbeat$.next(id)

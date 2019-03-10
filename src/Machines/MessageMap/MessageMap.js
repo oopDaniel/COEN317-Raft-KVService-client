@@ -2,32 +2,43 @@ import React, { useEffect, useContext, useState } from 'react';
 import { useObservable } from 'rxjs-hooks';
 import * as d3 from 'd3'
 import MachineContext from '../../shared/context/MachineContext'
+import { usePrevious } from '../../shared/utils'
 import { HEARTBEAT_INTERVAL, MSG_SINGLE_TRIP_TIME } from '../../shared/constants'
 import './MessageMap.css';
 
 function MessageMap () {
   const {
-    positions,
+    positions$,
     leader,
     alive,
     notifySentHeartbeat,
     receivedHeartbeat$
   } = useContext(MachineContext)
 
-  // Initialize positionMap
-  const [positionMap, setPositionMap] = useState(null)
-  useEffect(() => {
-    if (!positions || positions.length === 0) return
-    setPositionMap(positions.reduce((map, pos) => (map[pos.id] = pos) && map, {}))
-  }, [positions])
+  const positionMap = useObservable(() => positions$)
+
+  // TODO: todo
+  // const prevLeader = usePrevious(leader)
 
   // Start sending heartbeat after positionMap initialized and there's a leader
   const [circleGroups, setCircleGroups] = useState(null)
   const [d3Timeout, setD3Timeout] = useState(null)
+  const cleanD3Animation = () => {
+    if (d3Timeout) d3Timeout.stop()
+    setD3Timeout(null)
+  }
+
   useEffect(() => {
     if (positionMap === null) return
+    if (!leader) {
+      // no leader or leader crashed => cancel animation
+      cleanD3Animation()
+    }
+    console.log('asdasd', positionMap, leader, alive)
     renderChart()
-  }, [positionMap, leader, alive])
+    // -------------------------------------
+  }, [positionMap, leader, alive]) // TODO: manage these 3 states using RXJS
+  // -------------------------------------
 
   // Reply heartbeat only when received one and msg svgs are available
   const [prevLeader, setPrevLeader] = useState(leader)
@@ -40,7 +51,7 @@ function MessageMap () {
 
   function renderChart () {
     const leaderPos = positionMap[leader]
-    if (!leaderPos) { // Leader stepped down
+    if (!leaderPos) { // No leader or leader stepped down
       if (d3Timeout) {
         d3Timeout.stop()
         setD3Timeout(null)
@@ -50,14 +61,18 @@ function MessageMap () {
 
     const msgSvg = d3.select('svg.msg-svg')
 
-    // Only initialize once
     let circles = circleGroups
-    if (!circles) {
+    if (prevLeader !== leader) {
       circles = msgSvg.selectAll('.circleGroups')
-        .data(positions)
+        .data(Object.values(positionMap))
         .enter()
         .append('circle')
       setCircleGroups(circles)
+    } else {
+      if (d3Timeout) {
+        d3Timeout.stop()
+        setD3Timeout(null)
+      }
     }
 
     if (leader) {
@@ -65,6 +80,10 @@ function MessageMap () {
       setD3Timeout(
         d3.interval(() => heartbeat(leader), HEARTBEAT_INTERVAL)
       )
+    }
+
+    if (prevLeader !== leader) {
+      setPrevLeader(leader)
     }
 
     function heartbeat (currentLeader) {

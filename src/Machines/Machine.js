@@ -22,7 +22,7 @@ function Machine ({ id }) {
     select,
     unselect,
     isAlive: isAliveFunc,
-    appendPosition,
+    positions$,
     leader,
     heartbeat$,
     notifyReceivedHeartbeat
@@ -48,7 +48,7 @@ function Machine ({ id }) {
   // Store the position to context, so msg can use it
   useEffect(() => {
     const pos = getIconPosition(dbIconRef.current)
-    appendPosition(id, pos)
+    positions$.next({ id, ...pos })
   }, [])
 
   function renderDonut () {
