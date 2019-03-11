@@ -10,9 +10,9 @@ import './Sidebar.css';
 
 function Sidebar ({ customClass }) {
   // Machine related logic: selection and status check
-  const { selected, isAlive: isAliveFunc, toggleMachine } = useContext(MachineContext)
+  const { selected, /* isAlive: isAliveFunc, */ toggleMachine } = useContext(MachineContext)
   const hasSelected = selected !== null
-  const isAlive = hasSelected && isAliveFunc(selected)
+  const isAlive = hasSelected
 
   // Is showing logs or actions
   const [isLogs, setIsLogs] = useState(true)
