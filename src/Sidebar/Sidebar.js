@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { get, post, turnOn, turnOff } from '../shared/api';
+import { getState, putState, turnOn, turnOff } from '../shared/api';
 import SidebarLogs from './SidebarLogs/SidebarLogs'
 import SidebarActions from './SidebarActions/SidebarActions'
 import Btn from '../shared/Button/Button'
@@ -65,8 +65,8 @@ function Sidebar ({ customClass }) {
     newCommand.server = selected
     setCommands([...commands, newCommand])
     return newCommand.operation === 'GET'
-      ? get(`/state?key=${newCommand.data.key}`)
-      : post('/state', newCommand.data)
+      ? getState(machineInfo[selected].ip, newCommand.data.key)
+      : putState(machineInfo[selected].ip, newCommand.data)
   }
 
   const renderTitle = (hasSelected) => {

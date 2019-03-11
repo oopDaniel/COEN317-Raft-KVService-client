@@ -27,13 +27,14 @@ function SidebarActions ({ onCommand }) {
         data: { key, value }
       })
       if (isRead) {
-        setValue(res.Value)
+        setValue(res.data || '')
         setFetchedFromRead(true)
       } else {
         setFetchedFromRead(false)
       }
       open('Command Submitted')
     } catch (e) {
+      open('An error occurred.', e)
       console.log('Error submitting command', e)
     } finally {
       processingFunc(false)

@@ -8,8 +8,14 @@ const post = async (url, data) => (await instance({ method: 'post', url, data })
 const del = async (url, data) => (await instance({ method: 'delete', url, data })).data
 
 const getInfo = ip => get(`${ip}/inspect`)
-const turnOn = ip => get(`${ip}/turn_on`)
-const turnOff = ip => get(`${ip}/turn_off`)
+const turnOn = ip => post(`${ip}/turn_on`)
+const turnOff = ip => post(`${ip}/turn_off`)
+const getState = (ip, key) => get(`${ip}/get?key=${key}`)
+const putState = async (ip, data) => {
+  const res = await post(`${ip}/put?key=${data.key}&value=${data.value}`) // ???
+  if (!res.success) throw res.message
+  return res
+}
 
 export {
   get,
@@ -17,6 +23,8 @@ export {
   del,
   getInfo,
   turnOn,
-  turnOff
+  turnOff,
+  getState,
+  putState,
 }
 export default instance
