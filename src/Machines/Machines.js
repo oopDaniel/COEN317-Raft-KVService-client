@@ -1,35 +1,20 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { get } from '../shared/api';
+import React, { useContext } from 'react';
 import Machine from './Machine'
 import MessageMap from './MessageMap/MessageMap'
 import MachineContext from '../shared/context/MachineContext'
 import './Machines.scss';
 
 function Machines (props) {
-  const { loadAlive } = useContext(MachineContext)
-
-  const [machines, setMachines] = useState([])
-
-  const fetchMachines = async () => {
-    const data = await get('/machines/all');
-    setMachines(data);
-  }
-  const fetchAliveMachines = async () => {
-    const data = await get('/machines/alive');
-    loadAlive(data.reduce((map, m) => (map[m] = true) && map, {}))
-  }
-
-  useEffect(() => { fetchMachines() }, []);
-  useEffect(() => { fetchAliveMachines() }, []);
-
+  const { machines } = useContext(MachineContext)
   return (
     <div className={`machines ${props.customClass}`}>
       <div className="machine-list">
         {
-          machines.map(id => (
+          machines.map(m => (
             <Machine
-              id={id}
-              key={id}
+              id={m.id}
+              key={m.id}
+              ip={m.ip}
             ></Machine>
           ))
         }

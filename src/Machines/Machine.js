@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useContext, useState } from 'react';
 import { useObservable } from 'rxjs-hooks';
 import { FaDatabase, FaCrown } from 'react-icons/fa';
 import * as d3 from 'd3'
+import { get } from '../shared/api'
 import MachineContext from '../shared/context/MachineContext'
 import { ELECTION_DURATION_MIN, ELECTION_DURATION_MAX } from '../shared/constants'
 import './Machine.css';
@@ -13,7 +14,8 @@ const arc = d3.arc()
     .outerRadius(56)
     .startAngle(0);
 
-function Machine ({ id }) {
+function Machine (props) {
+  const { id, ip } = props
   const ELECTION_TIMEOUT = Math.random() * (ELECTION_DURATION_MAX - ELECTION_DURATION_MIN) + ELECTION_DURATION_MIN
   const PORTION_PER_SEC = DONUT_UPDATE_INTERVAL / ELECTION_TIMEOUT
   // Machine state related
@@ -21,18 +23,20 @@ function Machine ({ id }) {
     selected,
     select,
     unselect,
-    isAlive: isAliveFunc,
-    positions$,
+    machineInfo$,
     leader,
     heartbeat$,
     notifyReceivedHeartbeat
   } = useContext(MachineContext)
   const isSelected = selected === id
-  const isAlive = isAliveFunc(id)
+  const isAlive = true // todo
   const selectMachine = () => {
     if (id === selected) unselect()
     else select(id)
   }
+
+  // Update log for the selected machine
+  useLogUpdater(isSelected, props)
 
   // Need Ref of db icon to locate the position of messages
   const dbIconRef = useRef(null)
@@ -48,7 +52,7 @@ function Machine ({ id }) {
   // Store the position to context, so msg can use it
   useEffect(() => {
     const pos = getIconPosition(dbIconRef.current)
-    positions$.next({ id, ...pos })
+    machineInfo$.next({ id, ip, ...pos })
   }, [])
 
   function renderDonut () {
@@ -87,7 +91,7 @@ function Machine ({ id }) {
     }
 
     // Use isAliveFunc because d3 will not get the state update from React
-    const isTimerEnabled = leader !== id && isAliveFunc(id)
+    const isTimerEnabled = leader !== id // && isAliveFunc(id)
 
     // Start from a full donut
     let radio = 1
@@ -188,6 +192,17 @@ function getIconPosition (el) {
   x = ~~(x + width / 2)
   y = ~~(y + height / 2)
   return { x, y }
+}
+
+function useLogUpdater (isSelected, props) {
+  const { updateLog } = useContext(MachineContext)
+  const { id, ip } = props
+  useEffect(() => {
+    if (isSelected) {
+      get(`${ip}/inspect`)
+        .then(({ data }) => updateLog(id, data))
+    }
+  }, [isSelected])
 }
 
 export default Machine;

@@ -2,20 +2,19 @@ import React, { useEffect, useContext, useState } from 'react';
 import { useObservable } from 'rxjs-hooks';
 import * as d3 from 'd3'
 import MachineContext from '../../shared/context/MachineContext'
-import { usePrevious } from '../../shared/utils'
+// import { usePrevious } from '../../shared/utils'
 import { HEARTBEAT_INTERVAL, MSG_SINGLE_TRIP_TIME } from '../../shared/constants'
 import './MessageMap.css';
 
 function MessageMap () {
   const {
-    positions$,
+    machineInfo: positionMap,
     leader,
-    alive,
     notifySentHeartbeat,
     receivedHeartbeat$
   } = useContext(MachineContext)
 
-  const positionMap = useObservable(() => positions$)
+  // const positionMap = useObservable(() => positions$)
 
   // TODO: todo
   // const prevLeader = usePrevious(leader)
@@ -34,10 +33,10 @@ function MessageMap () {
       // no leader or leader crashed => cancel animation
       cleanD3Animation()
     }
-    console.log('asdasd', positionMap, leader, alive)
+    console.log('asdasd', positionMap, leader)
     renderChart()
     // -------------------------------------
-  }, [positionMap, leader, alive]) // TODO: manage these 3 states using RXJS
+  }, [positionMap, leader]) // TODO: use alive
   // -------------------------------------
 
   // Reply heartbeat only when received one and msg svgs are available
@@ -98,7 +97,7 @@ function MessageMap () {
         .duration(MSG_SINGLE_TRIP_TIME)
         .attr('cx', d => d.x)
         .attr('cy', d => d.y)
-        // .filter(d => alive[d.id])
+        // .filter(d => alive[d.id]) // todo
         .transition()
         .duration(0)
         .style('fill', 'var(--msg-ack')
