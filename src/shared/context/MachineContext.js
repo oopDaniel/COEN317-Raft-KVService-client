@@ -83,16 +83,20 @@ const liveness$ = mergedMachineLiveness$.pipe(
 // Stream of current leader
 const isLeader = R.propEq('leader', true)
 const filterBasedOnLiveness = ([leader, liveness]) => liveness[leader.index].alive ? leader : null
-const leaderFromIO$ = io$.pipe(
+const leaderHeartbeat$ = io$.pipe(
   map(R.compose(
     R.head,
     R.filter(isLeader),
     // Need index to find correct observable of liveness for filtering
     mapIndexed((v, index) => ({ ...v, index }))
   )),
-  tap(l => console.log('%c[leader] ', 'color:grey', l)),
+  filter(R.complement(R.isNil)),
+  debounceTime(3000), // suppose heartbeat interval will greater than 3 sec
+  // tap(l => console.log('%c[leader] heartbeat:', 'color:grey', l)),
+)
+const leaderFromIO$ = leaderHeartbeat$.pipe(
   distinctUntilKeyChanged('id'),
-  tap(l => console.log('%c[leader]', 'color:blue', l))
+  tap(l => console.log('%c[leader] (distinct)', 'color:yellow;font-size:2em', l))
 )
 const compareWithIdIfExists = R.ifElse(
   R.compose(
@@ -179,6 +183,7 @@ export function MachineProvider (props) {
 
       // Raft state
       leader,
+      leaderHeartbeat$,
       followerTimer$,
 
       // TODO
