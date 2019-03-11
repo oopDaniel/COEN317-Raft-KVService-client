@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { useObservable } from 'rxjs-hooks';
-import io from 'socket.io-client';
+import React, { useState } from 'react'
+import { useObservable } from 'rxjs-hooks'
+import io from 'socket.io-client'
 import * as R from 'ramda'
 import  {
   Subject,
-  // BehaviorSubject,
+  BehaviorSubject,
   ReplaySubject,
   fromEvent,
   forkJoin,
@@ -16,9 +16,11 @@ import {
   map,
   first,
   share,
+  distinctUntilChanged,
   distinctUntilKeyChanged,
   // tap,
-} from 'rxjs/operators';
+} from 'rxjs/operators'
+import { mapIndexed } from '../utils'
 import { KNOWN_SERVER_IPS } from '../constants'
 
 // Handle sockets
@@ -57,16 +59,50 @@ const io$ = combineLatest(...sockets.map(
   share(),
 )
 
+// Liveness of machines
+const machineLivenessSubjects = sockets.map(socket => ({ ...socket, sub: new BehaviorSubject(true) }))
+const machineLivenessSubjectMap = machineLivenessSubjects
+  .reduce((map, sub) => (map[sub.id] = sub) && map, {})
+const mergedMachineLiveness$ = combineLatest(...machineLivenessSubjects.map(s => s.sub))
+  .pipe(map(mapIndexed((alive, index) => ({ alive, id: sockets[index].id }))))
+
+// Stream of current leader
 const isLeader = R.propEq('leader', true)
-const leader$ = io$.pipe(
+const filterBasedOnLiveness = ([leader, liveness]) => liveness[leader.index].alive ? leader : null
+const leaderFromIO$ = io$.pipe(
   map(R.compose(
     R.head,
-    R.filter(isLeader)
+    R.filter(isLeader),
+    // Need index to find correct observable of liveness for filtering
+    mapIndexed((v, index) => ({ ...v, index }))
   )),
   distinctUntilKeyChanged('id')
 )
+const compareWithIdIfExists = R.ifElse(
+  R.compose(
+    R.any(R.isNil),
+    R.unapply(R.identity), // to array
+  ),
+  R.equals,
+  R.eqProps('id')
+)
+const leader$ = combineLatest(
+  leaderFromIO$,
+  mergedMachineLiveness$
+).pipe(
+  map(filterBasedOnLiveness),
+  distinctUntilChanged(compareWithIdIfExists)
+)
 
-const MachineContext = React.createContext();
+// Machine info
+const machineInfo$ = new ReplaySubject(5).pipe(
+  bufferCount(5),
+  map(pos => pos.reduce((map, pos) => (map[pos.id] = pos) && map, {})),
+  first(),
+  share()
+)
+
+const MachineContext = React.createContext()
 
 export function MachineProvider (props) {
   const [logs, setLogs] = useState({})
@@ -74,12 +110,9 @@ export function MachineProvider (props) {
 
   // ID, IP, positions on page, etc.
   const machines = useObservable(() => connectionReplaySubject, []) // 2nd arg: default value
-  const machineInfo$ = new Subject()
-  const machineInfo = useObservable(() => machineInfo$.pipe(
-    bufferCount(5),
-    map(pos => pos.reduce((map, pos) => (map[pos.id] = pos) && map, {})),
-    first()
-  ))
+  const machineInfo = useObservable(() => machineInfo$)
+
+  const liveness = useObservable(() => mergedMachineLiveness$)
 
   const leader = useObservable(() => leader$)
 
@@ -103,6 +136,16 @@ export function MachineProvider (props) {
       machineInfo$, // Subject to emit data
       machineInfo, // Parsed data
 
+      // Machine state
+      machineLivenessSubjectMap,
+      liveness,
+      toggleMachine: () => {
+        const prevState = R.find(R.propEq('id', selected), liveness)
+        if (prevState !== undefined) {
+          machineLivenessSubjectMap[selected].sub.next(!prevState)
+        }
+      },
+
       // Raft state
       leader,
 
@@ -115,34 +158,6 @@ export function MachineProvider (props) {
       select: setSelected,
       unselect: () => setSelected(null),
 
-      // TODO
-      toggleMachine: id => {
-        // mock leader re-election. TODO: use leader from server
-        // const newState = !state.alive[id]
-        // let newLeader = null
-
-        // if (!newState && id === state.leader) {
-        //   const ids = Object.keys(state.alive)
-        //     .filter(aliveId => aliveId !== id)
-        //   const idx = ~~(Math.random() * ids.length)
-        //   newLeader = ids[idx]
-        //   setTimeout(() => this.setState({
-        //     leader: newLeader
-        //   }), 30000)
-        // }
-
-        // if (newLeader === null) {
-        //   this.setState({
-        //     alive: {...state.alive, [id]: newState }
-        //   })
-        // } else {
-        //   this.setState({
-        //     alive: {...state.alive, [id]: newState },
-        //     leader: null
-        //   })
-        // }
-
-      },
       notifySentHeartbeat: () => state.heartbeat$.next(Math.random()),
       notifyReceivedHeartbeat: id => state.receivedHeartbeat$.next(id)
     }}>
@@ -152,4 +167,4 @@ export function MachineProvider (props) {
 
 }
 
-export default MachineContext;
+export default MachineContext

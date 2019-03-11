@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { get, post, del } from '../shared/api';
+import { get, post, turnOn, turnOff } from '../shared/api';
 import SidebarLogs from './SidebarLogs/SidebarLogs'
 import SidebarActions from './SidebarActions/SidebarActions'
 import Btn from '../shared/Button/Button'
@@ -10,7 +10,11 @@ import './Sidebar.css';
 
 function Sidebar ({ customClass }) {
   // Machine related logic: selection and status check
-  const { selected, /* isAlive: isAliveFunc, */ toggleMachine } = useContext(MachineContext)
+  const { selected,
+    /* isAlive: isAliveFunc, */
+    toggleMachine,
+    machineInfo,
+   } = useContext(MachineContext)
   const hasSelected = selected !== null
   const isAlive = hasSelected
 
@@ -33,20 +37,20 @@ function Sidebar ({ customClass }) {
 
     let hint = `Re-opening <${selected}>`
     let postHint = 'Opened'
-    let callApi = post
+    let callApi = turnOn
 
     // Setting machine to off
     if (isAlive) {
       hint = `Closing <${selected}>`
       postHint = 'Closed'
-      callApi = del
+      callApi = turnOff
       setIsLogs(true) // Submit command on disconnected machine is forbidden
     }
 
     open(hint)
     try {
-      await callApi(`/machine/${selected}`);
-      toggleMachine(selected)
+      await callApi(machineInfo[selected].ip)
+      toggleMachine()
       open(postHint)
     } catch (e) {
       console.log(e)

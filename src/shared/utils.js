@@ -1,4 +1,5 @@
 import { useRef, useEffect } from 'react'
+import { addIndex, map } from 'ramda'
 
 export function usePrevious (value) {
   const ref = useRef()
@@ -7,3 +8,5 @@ export function usePrevious (value) {
   })
   return ref.current
 }
+
+export const mapIndexed = addIndex(map)
