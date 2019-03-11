@@ -120,8 +120,7 @@ const followerTimer$ = io$.pipe(
     R.reject(R.either(isLeader, R.complement(R.has('id')))),
     // Need index to find correct observable of liveness for filtering
     mapIndexed((v, index) => ({ ...v, index }))
-  )),
-  tap(e => console.log('timer update', e))
+  ))
 )
 
 // Machine info

@@ -101,7 +101,7 @@ function Machine (props) {
     }
 
     // Use isAliveFunc because d3 will not get the state update from React
-    const isTimerEnabled = leader !== id // && isAliveFunc(id)
+    const isTimerEnabled = leader.id !== id // && isAliveFunc(id)
 
     // Start from a full donut
     let radio = 1
@@ -132,7 +132,7 @@ function Machine (props) {
           <svg className="timer" width="160" height="120"></svg>
         </div>
         {
-          leader === id && (
+          leader && leader.id === id && (
             <div className="crown-container">
               <FaCrown/>
             </div>
