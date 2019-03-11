@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useObservable } from 'rxjs-hooks'
 import io from 'socket.io-client'
 import * as R from 'ramda'
@@ -9,17 +9,22 @@ import  {
   fromEvent,
   forkJoin,
   combineLatest,
+  from
 } from 'rxjs'
 import {
   debounceTime,
   bufferCount,
   map,
+  startWith,
   first,
   share,
+  filter,
   distinctUntilChanged,
   distinctUntilKeyChanged,
-  // tap,
+  tap,
+  concatMap,
 } from 'rxjs/operators'
+import { getInfo } from '../api'
 import { mapIndexed } from '../utils'
 import { KNOWN_SERVER_IPS } from '../constants'
 
@@ -37,7 +42,7 @@ const connections$ = sockets.map(
     first()
   )
 )
-const connectionReplaySubject = new ReplaySubject()
+const connectionReplaySubject = new ReplaySubject().pipe(share())
 forkJoin(...connections$)
   .pipe(first()) // only need to recognize available machines once
   .subscribe(connectionReplaySubject)
@@ -52,10 +57,11 @@ const io$ = combineLatest(...sockets.map(
     map(R.compose(
       setLeaderFlag,
       e => R.mergeAll([R.pick(['id', 'ip'], socket), e])
-    ))
+    )),
+    startWith(null) // Necessary for socket from closed instance
   )
 )).pipe(
-  debounceTime(50),
+  debounceTime(100),
   share(),
 )
 
@@ -66,17 +72,25 @@ const machineLivenessSubjectMap = machineLivenessSubjects
 const mergedMachineLiveness$ = combineLatest(...machineLivenessSubjects.map(s => s.sub))
   .pipe(map(mapIndexed((alive, index) => ({ alive, id: sockets[index].id }))))
 
+const liveness$ = mergedMachineLiveness$.pipe(
+  map(arr => arr.reduce((m, l) => {
+    m[l.id] = l.alive
+    return m
+  }, {}))
+)
+
 // Stream of current leader
 const isLeader = R.propEq('leader', true)
 const filterBasedOnLiveness = ([leader, liveness]) => liveness[leader.index].alive ? leader : null
 const leaderFromIO$ = io$.pipe(
+  filter(R.complement(R.all(R.isNil))),
   map(R.compose(
     R.head,
     R.filter(isLeader),
     // Need index to find correct observable of liveness for filtering
     mapIndexed((v, index) => ({ ...v, index }))
   )),
-  distinctUntilKeyChanged('id')
+  distinctUntilKeyChanged('id'),
 )
 const compareWithIdIfExists = R.ifElse(
   R.compose(
@@ -112,7 +126,7 @@ export function MachineProvider (props) {
   const machines = useObservable(() => connectionReplaySubject, []) // 2nd arg: default value
   const machineInfo = useObservable(() => machineInfo$)
 
-  const liveness = useObservable(() => mergedMachineLiveness$)
+  const liveness = useObservable(() => liveness$)
 
   const leader = useObservable(() => leader$)
 
@@ -120,6 +134,8 @@ export function MachineProvider (props) {
     heartbeat$: new Subject(),
     receivedHeartbeat$: new Subject(),
   }
+
+  useMachineStateInitializer(machines)
 
   return (
     <MachineContext.Provider value={{
@@ -140,7 +156,7 @@ export function MachineProvider (props) {
       machineLivenessSubjectMap,
       liveness,
       toggleMachine: () => {
-        const prevState = R.find(R.propEq('id', selected), liveness)
+        const prevState = liveness[selected]
         if (prevState !== undefined) {
           machineLivenessSubjectMap[selected].sub.next(!prevState)
         }
@@ -164,7 +180,22 @@ export function MachineProvider (props) {
       { props.children }
     </MachineContext.Provider>
   )
+}
 
+function useMachineStateInitializer (machines) {
+  useEffect(() => {
+    if (machines.length) {
+      const { unsubscribe } = from(machines).pipe(
+        concatMap(m => getInfo(m.ip)),
+        map((e, i) => ({ ...machines[i], alive: R.path(['data', 'on/off'], e) }))
+      ).subscribe(e => {
+        if (!e.alive) {
+          machineLivenessSubjectMap[e.id].sub.next(false)
+        }
+      })
+      return unsubscribe
+    }
+  }, [machines])
 }
 
 export default MachineContext

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useContext, useState } from 'react';
 import { useObservable } from 'rxjs-hooks';
 import { FaDatabase, FaCrown } from 'react-icons/fa';
 import * as d3 from 'd3'
-import { get } from '../shared/api'
+import { getInfo } from '../shared/api'
 import MachineContext from '../shared/context/MachineContext'
 import { ELECTION_DURATION_MIN, ELECTION_DURATION_MAX } from '../shared/constants'
 import './Machine.css';
@@ -25,11 +25,12 @@ function Machine (props) {
     unselect,
     machineInfo$,
     leader,
+    liveness,
     heartbeat$,
     notifyReceivedHeartbeat
   } = useContext(MachineContext)
   const isSelected = selected === id
-  const isAlive = true // todo
+  const isAlive = liveness[id]
   const selectMachine = () => {
     if (id === selected) unselect()
     else select(id)
@@ -47,7 +48,7 @@ function Machine (props) {
 
   // Reset timer (update donut) when received heartbeat
   const receivedHeartbeat = useObservable(() => heartbeat$)
-  useEffect(() => { updateDonut() }, [receivedHeartbeat])
+  useEffect(() => { updateDonut() }, [receivedHeartbeat, isAlive])
 
   // Store the position to context, so msg can use it
   useEffect(() => {
@@ -83,6 +84,12 @@ function Machine (props) {
     const isFromHeartbeat = donut === undefined
     donut = timeoutDonut || donut
     if (!donut) return
+
+    if (!isAlive && d3Interval) {
+      d3Interval.stop()
+      setD3Interval(null)
+      return
+    }
 
     // cleanup old interval
     if (d3Interval) {
@@ -199,7 +206,7 @@ function useLogUpdater (isSelected, props) {
   const { id, ip } = props
   useEffect(() => {
     if (isSelected) {
-      get(`${ip}/inspect`)
+      getInfo(ip)
         .then(({ data }) => updateLog(id, data))
     }
   }, [isSelected])
