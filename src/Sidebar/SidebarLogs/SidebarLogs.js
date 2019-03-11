@@ -1,20 +1,23 @@
-import React from 'react';
+import React, { useContext } from 'react';
+import MachineContext from '../../shared/context/MachineContext'
 import './SidebarLogs.css';
 
-function SidebarLogs ({ logs, hideFooter, available = true }) {
+function SidebarLogs ({ hideFooter }) {
+  const { selectedLogs: logs = [] } = useContext(MachineContext)
   return (
     <div className={`sidebar-logs ${hideFooter ? 'hide-footer' : '' }`}>
       {
-        logs.length && available
+        logs.length
           ? logs.map((log, index) => {
-              if (log.operation === 'GET') {
+            const [ operation, key, value ] = log.command.split('|')
+              if (operation === 'GET') {
                 return (
                   <div className="log-container" key={index}>
                     <span className="log-number flex-center">{ index }</span>
                     <span className="log">
-                      <span className="log-content-server">&lt;Machine {log.server}&gt;</span>
+                      <span className="log-content-server">&lt;Term {log.term}&gt;</span>
                       <span className="log-content-op">Get</span>
-                      <span className="log-content-data">({log.data.key})</span>
+                      <span className="log-content-data">({key})</span>
                     </span>
                   </div>
                 )
@@ -23,9 +26,9 @@ function SidebarLogs ({ logs, hideFooter, available = true }) {
                   <div className="log-container" key={index}>
                     <span className="log-number flex-center">{ index }</span>
                     <span className="log">
-                      <span className="log-content-server">&lt;Machine {log.server}&gt;</span>
+                      <span className="log-content-server">&lt;Term {log.term}&gt;</span>
                       <span className="log-content-op">Set</span>
-                      <span className="log-content-data">({log.data.key} : {log.data.value})</span>
+                      <span className="log-content-data">({key} : {value})</span>
                     </span>
                   </div>
                 )
