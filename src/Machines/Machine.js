@@ -79,7 +79,7 @@ function Machine (props) {
   }
 
   function updateDonut (donut) {
-    console.log('update donut')
+    // console.log('update donut')
     // Only the initialized call will pass donut instance to this function
     const isFromHeartbeat = donut === undefined
     donut = timeoutDonut || donut

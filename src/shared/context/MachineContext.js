@@ -31,7 +31,7 @@ import {
   concatMapTo,
 } from 'rxjs/operators'
 import { getInfo } from '../api'
-import { mapIndexed } from '../utils'
+import { mapIndexed, exist } from '../utils'
 import { KNOWN_SERVER_IPS, HEARTBEAT_INTERVAL } from '../constants'
 
 // Handle sockets
@@ -64,6 +64,7 @@ const io$ = combineLatest(...sockets.map(
     timer(0, HEARTBEAT_INTERVAL).pipe(
       concatMapTo(race(
         fromEvent(socket.io, 'raftEvent').pipe(
+          // tap(q => console.log('sock', q)),
           map(R.compose(
             setLeaderFlag,
             e => R.mergeAll([R.pick(['id', 'ip'], socket), e])
@@ -71,7 +72,7 @@ const io$ = combineLatest(...sockets.map(
           startWith(null), // Unify stream start time
           take(2)
         ),
-        of('timeout').pipe(delay(HEARTBEAT_INTERVAL / 2)) // Somehow necessary
+        of('timeout').pipe(delay(1000)) // Somehow necessary
       ))
     )
 )).pipe(
@@ -106,7 +107,7 @@ const leaderHeartbeat$ = io$.pipe(
     // Need index to find correct observable of liveness for filtering
     mapIndexed((v, index) => ({ ...v, index }))
   )),
-  filter(R.complement(R.isNil)),
+  filter(exist),
   debounceTime(3000), // suppose heartbeat interval will greater than 3 sec
   // tap(l => console.log('%c[leader] heartbeat:', 'color:grey', l)),
 )

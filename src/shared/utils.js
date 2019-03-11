@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react'
-import { addIndex, map } from 'ramda'
+import { addIndex, map, complement, isNil } from 'ramda'
 
 export function usePrevious (value) {
   const ref = useRef()
@@ -10,3 +10,5 @@ export function usePrevious (value) {
 }
 
 export const mapIndexed = addIndex(map)
+
+export const exist = complement(isNil)
