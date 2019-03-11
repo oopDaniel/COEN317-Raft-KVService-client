@@ -4,7 +4,6 @@ import { FaDatabase, FaCrown } from 'react-icons/fa';
 import * as d3 from 'd3'
 import { getInfo } from '../shared/api'
 import MachineContext from '../shared/context/MachineContext'
-import { ELECTION_DURATION_MIN, ELECTION_DURATION_MAX } from '../shared/constants'
 import './Machine.css';
 
 const DONUT_UPDATE_INTERVAL = 600
@@ -16,8 +15,9 @@ const arc = d3.arc()
 
 function Machine (props) {
   const { id, ip } = props
-  const ELECTION_TIMEOUT = Math.random() * (ELECTION_DURATION_MAX - ELECTION_DURATION_MIN) + ELECTION_DURATION_MIN
-  const PORTION_PER_SEC = DONUT_UPDATE_INTERVAL / ELECTION_TIMEOUT
+
+  const timer = useFollowerTimer(id)
+  const PORTION_PER_SEC = DONUT_UPDATE_INTERVAL / timer
   // Machine state related
   const {
     selected,
@@ -44,11 +44,11 @@ function Machine (props) {
 
   const [timeoutDonut, setTimeoutDonut] = useState(null)
   const [d3Interval, setD3Interval] = useState(null)
-  useEffect(() => { renderDonut() }, [leader])
+  useEffect(() => { renderDonut() }, [])
 
   // Reset timer (update donut) when received heartbeat
   const receivedHeartbeat = useObservable(() => heartbeat$)
-  useEffect(() => { updateDonut() }, [receivedHeartbeat, isAlive])
+  useEffect(() => { updateDonut() }, [receivedHeartbeat, isAlive, timer])
 
   // Store the position to context, so msg can use it
   useEffect(() => {
@@ -57,7 +57,6 @@ function Machine (props) {
   }, [])
 
   function renderDonut () {
-    if (!leader) return
     // Donut timer
     const svg = d3.select(`.machine-${id} svg.timer`)
     const width = Number(svg.attr('width'))
@@ -80,10 +79,14 @@ function Machine (props) {
   }
 
   function updateDonut (donut) {
+    console.log('update donut')
     // Only the initialized call will pass donut instance to this function
     const isFromHeartbeat = donut === undefined
     donut = timeoutDonut || donut
     if (!donut) return
+
+    // todo
+    if (!leader) return
 
     if (!isAlive && d3Interval) {
       d3Interval.stop()
@@ -210,6 +213,20 @@ function useLogUpdater (isSelected, props) {
         .then(({ data }) => updateLog(id, data))
     }
   }, [isSelected])
+}
+
+function useFollowerTimer (id) {
+  const [timer, setTimer] = useState(Number.MAX_SAFE_INTEGER)
+  const { followerTimer$ } = useContext(MachineContext)
+
+  useEffect(() => {
+    const { unsubscribe } = followerTimer$.subscribe(newTimerSet => {
+      if (newTimerSet && newTimerSet[id]) setTimer(newTimerSet[id])
+    })
+    return unsubscribe
+  }, [followerTimer$])
+
+  return timer
 }
 
 export default Machine;
