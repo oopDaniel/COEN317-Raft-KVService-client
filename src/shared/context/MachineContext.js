@@ -9,24 +9,30 @@ import  {
   fromEvent,
   forkJoin,
   combineLatest,
-  from
+  from,
+  timer,
+  race,
+  of,
 } from 'rxjs'
 import {
   debounceTime,
   bufferCount,
   map,
   startWith,
+  take,
   first,
   share,
   filter,
   distinctUntilChanged,
   distinctUntilKeyChanged,
   tap,
+  delay,
   concatMap,
+  concatMapTo,
 } from 'rxjs/operators'
 import { getInfo } from '../api'
 import { mapIndexed } from '../utils'
-import { KNOWN_SERVER_IPS } from '../constants'
+import { KNOWN_SERVER_IPS, HEARTBEAT_INTERVAL } from '../constants'
 
 // Handle sockets
 const sockets = KNOWN_SERVER_IPS.map((ip, index) => ({
@@ -52,19 +58,29 @@ const setLeaderFlag = R.when(
   R.propEq('type', 'broadcastingEntries'),
   R.assoc('leader', true)
 )
+
 const io$ = combineLatest(...sockets.map(
-  socket => fromEvent(socket.io, 'raftEvent').pipe(
-    map(R.compose(
-      setLeaderFlag,
-      e => R.mergeAll([R.pick(['id', 'ip'], socket), e])
-    )),
-    startWith(null) // Necessary for socket from closed instance
-  )
+  socket =>
+    timer(0, HEARTBEAT_INTERVAL).pipe(
+      concatMapTo(race(
+        fromEvent(socket.io, 'raftEvent').pipe(
+          map(R.compose(
+            setLeaderFlag,
+            e => R.mergeAll([R.pick(['id', 'ip'], socket), e])
+          )),
+          startWith(null), // Unify stream start time
+          take(2)
+        ),
+        of('timeout').pipe(delay(HEARTBEAT_INTERVAL / 2)) // Somehow necessary
+      ))
+    )
 )).pipe(
-  debounceTime(100),
+  debounceTime(2000),
   filter(R.complement(R.all(R.isNil))),
   share(),
 )
+
+io$.subscribe(e => console.log('%c[IO event]', 'color:lightgreen;font-size:1.2em', e))
 
 // Liveness of machines
 const machineLivenessSubjects = sockets.map(socket => ({ ...socket, sub: new BehaviorSubject(true) }))
@@ -96,7 +112,7 @@ const leaderHeartbeat$ = io$.pipe(
 )
 const leaderFromIO$ = leaderHeartbeat$.pipe(
   distinctUntilKeyChanged('id'),
-  tap(l => console.log('%c[leader] (distinct)', 'color:yellow;font-size:2em', l))
+  tap(l => console.log('%c[leader] (distinct)', 'color:yellow;font-size:2em', l && l.id))
 )
 const compareWithIdIfExists = R.ifElse(
   R.compose(
