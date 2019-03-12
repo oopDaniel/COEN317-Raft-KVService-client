@@ -58,7 +58,7 @@ const setLeaderFlag = R.when(
   R.assoc('leader', true)
 )
 
-const io$ = combineLatest(...sockets.map(
+const rawIo$ = combineLatest(...sockets.map(
   socket =>
     timer(0, HEARTBEAT_INTERVAL).pipe(
       concatMapTo(race(
@@ -70,16 +70,18 @@ const io$ = combineLatest(...sockets.map(
           )),
           take(1) // so that streams ends, next time will be a fresh race
         ),
-        of('timeout').pipe(delay(HEARTBEAT_INTERVAL - 500)) // Somehow necessary
+        of('timeout').pipe(delay(HEARTBEAT_INTERVAL)) // Somehow necessary
       ))
     )
-)).pipe(
-  debounceTime(2000),
+))
+
+const io$ = rawIo$.pipe(
+  debounceTime(1000),
   filter(R.complement(R.all(R.isNil))),
   share(),
 )
 
-io$.subscribe(e => console.log('%c[IO event]', 'color:lightgreen;font-size:1.2em', e))
+rawIo$.subscribe(e => console.log('%c[IO event]', 'color:lightgreen;font-size:1.2em', e))
 
 // Liveness of machines
 const machineLivenessSubjects = sockets.map(socket => ({ ...socket, sub: new BehaviorSubject(true) }))

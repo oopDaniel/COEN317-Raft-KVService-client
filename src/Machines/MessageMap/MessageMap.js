@@ -7,7 +7,7 @@ import { MSG_SINGLE_TRIP_TIME } from '../../shared/constants'
 import { exist } from '../../shared/utils'
 import './MessageMap.css';
 
-const isDifferentLeader = (prevLeader, leader) => R.and(exist(prevLeader), R.not(R.eqProps('id'), leader, prevLeader))
+const isDifferentLeader = (prevLeader, leader) => exist(prevLeader) && R.not(R.eqProps('id', leader, prevLeader))
 
 function MessageMap () {
   const {
@@ -20,14 +20,19 @@ function MessageMap () {
   const [prevLeader, setPrevLeader] = useState(leader)
   const [circleGroups, setCircleGroups] = useState(null)
   useEffect(() => {
-    console.log('%cLeader msg', 'color:purple;font-size:1.5em', {positionMap}, {liveness}, {leader: leader && leader.id || null}, circleGroups)
+    console.log('%cLeader msg', 'color:purple;font-size:1.5em', {positionMap}, {liveness}, {leader: leader && leader.id || null}, {prevLeader: prevLeader && prevLeader.id || null}, circleGroups)
     if (positionMap === null || liveness === null || !leader) return
 
-    // console.warn('--',leader, prevLeader)
+    console.warn('--',leader, prevLeader, isDifferentLeader(prevLeader, leader))
+    const hasLeaderChanged = isDifferentLeader(prevLeader, leader)
     let sub
-    if (!circleGroups || isDifferentLeader(leader, prevLeader)) {
-      createMsgCircles(leader)
-      setPrevLeader(leader)
+    if (!circleGroups || hasLeaderChanged) {
+      if (!circleGroups) {
+        createMsgCircles(leader)
+      } else {
+        createMsgCircles(leader)
+        setPrevLeader(leader)
+      }
     } else {
       sub = leaderHeartbeat$.subscribe(sendHeartbeatMsg)
     }
@@ -49,6 +54,7 @@ function MessageMap () {
   }, [followerTimer$, liveness, circleGroups, prevLeader])
 
   function createMsgCircles (leader) {
+    console.log('<created circles> for leader', leader && leader.id)
     const msgSvg = d3.select('svg.msg-svg')
     msgSvg.selectAll('circle').remove()
     const circles = msgSvg.selectAll('.circleGroups')
@@ -56,17 +62,11 @@ function MessageMap () {
       .enter()
       .append('circle')
     setCircleGroups(circles)
-    console.log('<created circles>')
   }
 
   function sendHeartbeatMsg () {
-    console.log(' - render - ')
-
-    heartbeat(leader)
-
-    function heartbeat (currentLeader) {
-      console.warn('currentLeader', currentLeader && currentLeader.id)
-      const { x: leaderX, y: leaderY } = positionMap[currentLeader.id]
+    console.log(' - sending heartbeat msg circles - from leader', leader && leader.id)
+    const { x: leaderX, y: leaderY } = positionMap[leader.id]
       circleGroups
         .filter(d => d.id !== leader)
         .attr('r', 10)
@@ -82,14 +82,18 @@ function MessageMap () {
         .duration(0)
         .style('fill', 'var(--msg-ack')
         .on('end', () => {
-          if (currentLeader) setPrevLeader(currentLeader)
+          if (leader) setPrevLeader(leader)
         })
-    }
   }
 
   function replyAck () {
     // console.log(' (((- leader id', leader.id, 'prevLeader id:', prevLeader.id)
-    const { x: leaderX, y: leaderY } = positionMap[leader.id || prevLeader.id]
+    const currLeader = leader || prevLeader
+    if (!currLeader) {
+      console.error('NO LEADER to reply')
+      return
+    }
+    const { x: leaderX, y: leaderY } = positionMap[R.prop('id', currLeader)]
     circleGroups
       .filter(d => liveness[d.id])
       .transition()
