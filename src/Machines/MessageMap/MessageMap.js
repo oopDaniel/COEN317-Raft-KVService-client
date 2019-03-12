@@ -14,7 +14,9 @@ function MessageMap () {
     machineInfo: positionMap,
     leader,
     liveness,
-    leaderHeartbeat$
+    leaderHeartbeatWithCommand$: leaderHeartbeat$,
+    receivedUiHeartbeat$,
+    receivedUiAck$,
   } = useContext(MachineContext)
 
   // Heartbeat
@@ -66,7 +68,8 @@ function MessageMap () {
     setCircleGroups(circles)
   }
 
-  function sendHeartbeatMsg () {
+  function sendHeartbeatMsg (heartbeat) {
+    const { cmd } = heartbeat
     console.log(' - sending heartbeat msg circles - from leader', leader && leader.id)
     const { x: leaderX, y: leaderY } = positionMap[leader.id]
       circleGroups
@@ -74,7 +77,7 @@ function MessageMap () {
         .attr('r', 10)
         .attr('cx', leaderX)
         .attr('cy', leaderY)
-        .style('fill', 'var(--msg-heartbeat)')
+        .style('fill', cmd ? 'var(--msg-cmd-heartbeat)' : 'var(--msg-heartbeat)')
         .transition()
         .duration(MSG_SINGLE_TRIP_TIME)
         .attr('cx', d => d.x)
@@ -83,8 +86,9 @@ function MessageMap () {
         .transition()
         .duration(0)
         .style('fill', 'var(--msg-ack')
-        .on('end', () => {
+        .on('end', _ => {
           if (leader) setPrevLeader(leader)
+          receivedUiHeartbeat$.next(cmd)
         })
   }
 
@@ -102,6 +106,7 @@ function MessageMap () {
       .duration(MSG_SINGLE_TRIP_TIME)
       .attr('cx', leaderX)
       .attr('cy', leaderY)
+      .on('end', _ => receivedUiAck$.next(true))
   }
 
   return (

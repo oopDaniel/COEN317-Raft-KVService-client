@@ -5,6 +5,7 @@ import * as R from 'ramda'
 import  {
   BehaviorSubject,
   ReplaySubject,
+  Subject,
   fromEvent,
   forkJoin,
   combineLatest,
@@ -110,6 +111,7 @@ const liveness$ = mergedMachineLiveness$.pipe(
 // Stream of current leader
 const isLeader = R.propEq('leader', true)
 const isExistentLeader = R.both(exist, isLeader)
+const isExistentAndNotLeader = R.both(exist, R.complement(isLeader))
 const findAndAddIndexToLeader = R.converge(R.assoc('index'), [R.findIndex(isExistentLeader), R.find(isExistentLeader)])
 const leaderMsg$ = rawIoMerged$.pipe(
   filter(R.any(isExistentLeader)),
@@ -118,7 +120,6 @@ const leaderMsg$ = rawIoMerged$.pipe(
 
 const leaderHeartbeat$ = leaderMsg$.pipe(
   debounceTime(4000) // suppose heartbeat interval is 6 sec, 4 should be sufficient.
-    // tap(l => console.log('%c[leader] heartbeat:', 'color:grey', l)),
 )
 const leaderFromIO$ = leaderMsg$.pipe(
   distinctUntilKeyChanged('id'),
@@ -160,6 +161,13 @@ const command$ = leaderMsg$.pipe(
   debounceTime(1000),
 )
 
+const leaderHeartbeatWithCommand$ = leaderHeartbeat$.pipe(
+  withLatestFrom(command$.pipe(startWith(null))),
+  map(([heartbeat, cmd]) => {
+    heartbeat.cmd = cmd
+    return heartbeat
+  })
+)
 
 const commandValid$ = followerTimer$.pipe(
   withLatestFrom(command$),
@@ -184,9 +192,28 @@ const machineInfo$ = new ReplaySubject(5).pipe(
 )
 
 // UI Heartbeat - required for replying 1st ack
-// const uiHeartbeat$ = new Subject().pipe(debounceTime(50))
-// const receivedUiHeartbeat$ = new Subject()
+const uiHeartbeat$ = new Subject().pipe(debounceTime(50))
+const receivedUiHeartbeat$ = new Subject()
+const receivedUiAck$ = new Subject()
 
+const anyFollowerTimer$ = rawIoMerged$.pipe(
+  filter(R.any(isExistentAndNotLeader)),
+  map(R.find(isExistentAndNotLeader)),
+)
+
+const receivedUiHeartbeatAndAck$ = receivedUiAck$.pipe(
+  startWith(null),
+  withLatestFrom(receivedUiHeartbeat$.pipe(
+    startWith(null),
+    withLatestFrom(anyFollowerTimer$.pipe(
+      filter(R.has('timer')),
+      debounceTime(200)
+    )),
+    map(R.nth(0))
+  )),
+  filter(R.all(exist)),
+  first()
+)
 
 const MachineContext = React.createContext()
 
@@ -231,17 +258,21 @@ export function MachineProvider (props) {
       // Raft state
       leader,
       leaderHeartbeat$,
+      leaderHeartbeatWithCommand$,
       followerTimer$,
 
       // Command
       command$,
       commandValid$,
 
-      // For single machine sync donut
+      // For single machine syncing donut
       sockets,
-      // TODO
-      // uiHeartbeat$,
-      // receivedUiHeartbeat$,
+
+      // UI states for circle msg
+      uiHeartbeat$,
+      receivedUiHeartbeat$,
+      receivedUiAck$,
+      receivedUiHeartbeatAndAck$,
 
       // Machine selection
       selected,

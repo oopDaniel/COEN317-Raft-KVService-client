@@ -7,3 +7,7 @@
   z-index: 10;
   background: #fff;
 }
+
+.applied-cmd.dead {
+  display: none;
+}

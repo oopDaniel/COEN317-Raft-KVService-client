@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
+import * as R from 'ramda'
 import { getState, putState, turnOn, turnOff } from '../shared/api';
 import SidebarLogs from './SidebarLogs/SidebarLogs'
 import SidebarActions from './SidebarActions/SidebarActions'
@@ -15,6 +16,7 @@ function Sidebar ({ customClass }) {
     liveness,
     toggleMachine,
     machineInfo,
+    receivedUiHeartbeatAndAck$,
    } = useContext(MachineContext)
   const hasSelected = selected !== null
   const isAlive = hasSelected && liveness[selected]
@@ -64,9 +66,10 @@ function Sidebar ({ customClass }) {
   const handleCommand = (newCommand) => {
     newCommand.server = selected
     setCommands([...commands, newCommand])
-    return newCommand.operation === 'GET'
+    const promise = newCommand.operation === 'GET'
       ? getState(machineInfo[selected].ip, newCommand.data.key)
       : putState(machineInfo[selected].ip, newCommand.data)
+    return Promise.all([promise, receivedUiHeartbeatAndAck$.toPromise()]).then(R.nth(0))
   }
 
   const renderTitle = (hasSelected) => {

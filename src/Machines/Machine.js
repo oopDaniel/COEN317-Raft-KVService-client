@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useContext, useState } from 'react';
 import { useObservable } from 'rxjs-hooks';
-import { share, filter, map } from 'rxjs/operators';
+import { share, filter, map, withLatestFrom, startWith, debounceTime } from 'rxjs/operators';
 import * as d3 from 'd3'
 import * as R from 'ramda'
 import { FaDatabase, FaCrown } from 'react-icons/fa';
@@ -29,6 +29,8 @@ function Machine (props) {
     leader,
     liveness,
     sockets,
+    receivedUiHeartbeat$,
+    command$,
   } = useContext(MachineContext)
 
   const isSelected = selected === id
@@ -38,15 +40,38 @@ function Machine (props) {
     else select(id)
   }
 
+  const [cmd, setCmd] = useState(null)
+  useEffect(() => {
+    const { unsubscribe } = command$
+      .pipe(
+        filter(_ => leader && leader.id === id),
+        startWith(null),
+      )
+      .subscribe(setCmd)
+    return R.tryCatch(unsubscribe)
+  }, [command$, leader])
+
+  const newTimer = useObservable(() => receivedUiHeartbeat$.pipe(
+    startWith(null),
+    withLatestFrom(raft$.pipe(
+      filter(R.has('timer')),
+      map(R.compose(R.multiply(1000), R.prop('timer'))),
+      debounceTime(100),
+      startWith(Number.MAX_SAFE_INTEGER)
+    )),
+    map(R.compose(
+      R.nth(1),
+      R.when(
+        R.compose(exist, R.head), // receive a heartbeat with cmd
+        R.tap(R.compose(setCmd, R.nth(0)))
+      )
+    )
+  )))
+
   const raft$ = sockets.find(s => s.id === id).io$.pipe(
     filter(exist),
     share()
   )
-  const newTimer = useObservable(() => raft$.pipe(
-    filter(R.has('timer')),
-    map(R.compose(R.multiply(1000), R.prop('timer')))
-  ), Number.MAX_SAFE_INTEGER)
-  const PORTION_PER_SEC = DONUT_UPDATE_INTERVAL / newTimer
 
   // Update log for the selected machine
   useLogUpdater(isSelected, props)
@@ -90,19 +115,9 @@ function Machine (props) {
   }
 
   function updateDonut (donut) {
-    // console.log('update donut')
     // Only the initialized call will pass donut instance to this function
     donut = timeoutDonut || donut
     if (!donut) return
-
-    // todo
-    if (!leader) return
-
-    if (!isAlive && d3Interval) {
-      d3Interval.stop()
-      setD3Interval(null)
-      return
-    }
 
     // cleanup old interval
     if (d3Interval) {
@@ -110,25 +125,30 @@ function Machine (props) {
       setD3Interval(null)
     }
 
-    // Use isAliveFunc because d3 will not get the state update from React
-    const isTimerEnabled = leader.id !== id // && isAliveFunc(id)
+    const isAlive = liveness[id]
+    if (!isAlive || (leader && leader.id === id)) {
+      donut.transition()
+        .duration(0)
+        .attrTween('d', arcTween(0))
+      return
+    }
+
+    const PORTION_PER_SEC = DONUT_UPDATE_INTERVAL / newTimer
 
     // Start from a full donut
     let radio = 1
-    if (isTimerEnabled) {
-      donut.transition()
-        .duration(300)
-        .attrTween('d', arcTween(radio * PI_2))
+    donut.transition()
+      .duration(300)
+      .attrTween('d', arcTween(radio * PI_2))
 
-      setD3Interval(
-        d3.interval(() => {
-          radio = Math.max(0, radio - PORTION_PER_SEC)
-          donut.transition()
-            .duration(DONUT_UPDATE_INTERVAL)
-            .attrTween('d', arcTween(radio * PI_2))
-          }, DONUT_UPDATE_INTERVAL)
-      )
-    }
+    setD3Interval(
+      d3.interval(() => {
+        radio = Math.max(0, radio - PORTION_PER_SEC)
+        donut.transition()
+          .duration(DONUT_UPDATE_INTERVAL)
+          .attrTween('d', arcTween(radio * PI_2))
+        }, DONUT_UPDATE_INTERVAL)
+    )
   }
 
   return (
@@ -151,8 +171,15 @@ function Machine (props) {
           <FaDatabase/>
         </div>
         <span className="machine-id">{id}</span>
-        <div className={`cmd ${id === 'A' ? 'left' : ''}`}>
-          <AppliedCommand id={id}/>
+        <div className='cmd'>
+          {
+            cmd && (
+              <AppliedCommand
+                isAlive={isAlive}
+                cmd={cmd}
+              />
+            )
+          }
         </div>
       </div>
     </div>
