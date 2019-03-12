@@ -18,7 +18,6 @@ import {
   debounceTime,
   bufferCount,
   map,
-  startWith,
   take,
   first,
   share,
@@ -64,15 +63,14 @@ const io$ = combineLatest(...sockets.map(
     timer(0, HEARTBEAT_INTERVAL).pipe(
       concatMapTo(race(
         fromEvent(socket.io, 'raftEvent').pipe(
-          // tap(q => console.log('sock', q)),
+          tap(q => console.log('socks', q)),
           map(R.compose(
             setLeaderFlag,
             e => R.mergeAll([R.pick(['id', 'ip'], socket), e])
           )),
-          startWith(null), // Unify stream start time
-          take(2)
+          take(1) // so that streams ends, next time will be a fresh race
         ),
-        of('timeout').pipe(delay(1000)) // Somehow necessary
+        of('timeout').pipe(delay(HEARTBEAT_INTERVAL - 500)) // Somehow necessary
       ))
     )
 )).pipe(
