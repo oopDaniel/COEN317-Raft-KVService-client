@@ -35,7 +35,10 @@ import { KNOWN_SERVER_IPS, HEARTBEAT_INTERVAL } from '../constants'
 
 // Use `broadcastingEntries` to identify leader
 const setLeaderFlag = R.when(
-  R.propEq('type', 'broadcastingEntries'),
+  R.either(
+    R.propEq('type', 'broadcastingEntries'),
+    R.propEq('type', 'commandReceived')
+  ),
   R.assoc('leader', true)
 )
 
@@ -69,8 +72,8 @@ forkJoin(...connections$)
   .pipe(first()) // only need to recognize available machines once
   .subscribe(connectionReplaySubject)
 
-const rawIo$ = sockets.map(socket => socket.io$)
-const rawIoMerged$ = combineLatest(...rawIo$)
+const rawIos = sockets.map(socket => socket.io$)
+const rawIoMerged$ = combineLatest(...rawIos)
 
 const rawIoWithTimeout$ = combineLatest(...sockets.map(
   socket =>
@@ -106,20 +109,18 @@ const liveness$ = mergedMachineLiveness$.pipe(
 
 // Stream of current leader
 const isLeader = R.propEq('leader', true)
-const filterBasedOnLiveness = ([leader, liveness]) => liveness[leader.index].alive ? leader : null
-const leaderHeartbeat$ = rawIoMerged$.pipe(
-  filter(R.any(R.both(exist, isLeader))),
-  map(R.compose(
-    R.head,
-    R.filter(isLeader),
-    // Need index to find correct observable of liveness for filtering
-    mapIndexed((v, index) => ({ ...v, index }))
-  )),
-  filter(exist),
-  debounceTime(3000), // suppose heartbeat interval will greater than 3 sec
-  // tap(l => console.log('%c[leader] heartbeat:', 'color:grey', l)),
+const isExistentLeader = R.both(exist, isLeader)
+const findAndAddIndexToLeader = R.converge(R.assoc('index'), [R.findIndex(isExistentLeader), R.find(isExistentLeader)])
+const leaderMsg$ = rawIoMerged$.pipe(
+  filter(R.any(isExistentLeader)),
+  map(findAndAddIndexToLeader),
 )
-const leaderFromIO$ = leaderHeartbeat$.pipe(
+
+const leaderHeartbeat$ = leaderMsg$.pipe(
+  debounceTime(4000) // suppose heartbeat interval is 6 sec, 4 should be sufficient.
+    // tap(l => console.log('%c[leader] heartbeat:', 'color:grey', l)),
+)
+const leaderFromIO$ = leaderMsg$.pipe(
   distinctUntilKeyChanged('id'),
   tap(l => console.log('%c[leader] (distinct)', 'color:yellow;font-size:2em', l && l.id))
 )
@@ -131,6 +132,7 @@ const compareWithIdIfExists = R.ifElse(
   R.equals,
   R.eqProps('id')
 )
+const filterBasedOnLiveness = ([leader, liveness]) => liveness[leader.index].alive ? leader : null
 const leader$ = combineLatest(
   leaderFromIO$,
   mergedMachineLiveness$
@@ -139,7 +141,7 @@ const leader$ = combineLatest(
   distinctUntilChanged(compareWithIdIfExists)
 )
 
-// Timer of follower
+// Timer of all followers. Required for sending ack in MsgMap component
 const followerTimer$ = io$.pipe(
   map(R.compose(
     R.reduce((m, e) => {
@@ -153,16 +155,9 @@ const followerTimer$ = io$.pipe(
 )
 
 // Command related
-const command$ = rawIoMerged$.pipe(
-  map(R.compose(
-    R.head,
-    R.filter(R.propEq('type', 'commandReceived')),
-    // Need index to find correct observable of liveness for filtering
-    mapIndexed((v, index) => ({ ...v, index }))
-  )),
-  filter(exist),
+const command$ = leaderMsg$.pipe(
+  filter(R.propEq('type', 'commandReceived')),
   debounceTime(1000),
-  tap(e => console.log('\tcmd received', e))
 )
 
 
