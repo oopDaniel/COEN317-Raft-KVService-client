@@ -17,6 +17,7 @@ function MessageMap () {
     leaderHeartbeat$
   } = useContext(MachineContext)
 
+  // Heartbeat
   const [prevLeader, setPrevLeader] = useState(leader)
   const [circleGroups, setCircleGroups] = useState(null)
   useEffect(() => {
@@ -42,6 +43,7 @@ function MessageMap () {
     }, () => {})
   }, [positionMap, liveness, leader, circleGroups])
 
+  // Acknowledgement
   const { followerTimer$ } = useContext(MachineContext)
   useEffect(() => {
     console.log('%ccalling ack', 'color:red;font-size:1.5em', {prevLeader: prevLeader && prevLeader.id || null}, {leader: leader && leader.id || null}, {liveness}, circleGroups)

@@ -63,7 +63,7 @@ const rawIo$ = combineLatest(...sockets.map(
     timer(0, HEARTBEAT_INTERVAL).pipe(
       concatMapTo(race(
         fromEvent(socket.io, 'raftEvent').pipe(
-          tap(q => console.log('socks', q)),
+          // tap(q => console.log('socks', q)),
           map(R.compose(
             setLeaderFlag,
             e => R.mergeAll([R.pick(['id', 'ip'], socket), e])
@@ -73,12 +73,22 @@ const rawIo$ = combineLatest(...sockets.map(
         of('timeout').pipe(delay(HEARTBEAT_INTERVAL)) // Somehow necessary
       ))
     )
-))
+)).pipe(share())
 
 const io$ = rawIo$.pipe(
   debounceTime(1000),
   filter(R.complement(R.all(R.isNil))),
-  share(),
+)
+
+const command$ = rawIo$.pipe(
+  map(R.compose(
+    R.head,
+    R.filter(R.propEq('type', 'commandReceived')),
+    // Need index to find correct observable of liveness for filtering
+    mapIndexed((v, index) => ({ ...v, index }))
+  )),
+  filter(exist),
+  debounceTime(1000)
 )
 
 rawIo$.subscribe(e => console.log('%c[IO event]', 'color:lightgreen;font-size:1.2em', e))
@@ -152,6 +162,11 @@ const machineInfo$ = new ReplaySubject(5).pipe(
   share()
 )
 
+// UI Heartbeat - required for replying 1st ack
+// const uiHeartbeat$ = new Subject().pipe(debounceTime(50))
+// const receivedUiHeartbeat$ = new Subject()
+
+
 const MachineContext = React.createContext()
 
 export function MachineProvider (props) {
@@ -165,12 +180,6 @@ export function MachineProvider (props) {
   const liveness = useObservable(() => liveness$)
 
   const leader = useObservable(() => leader$)
-
-  const state = {
-    heartbeat$: new Subject(),
-    receivedHeartbeat$: new Subject(),
-  }
-
   useMachineStateInitializer(machines)
 
   return (
@@ -203,17 +212,19 @@ export function MachineProvider (props) {
       leaderHeartbeat$,
       followerTimer$,
 
+      // Command
+      command$,
+
       // TODO
-      heartbeat$: state.heartbeat$.pipe(debounceTime(50)),
-      receivedHeartbeat$: state.receivedHeartbeat$,
+      // uiHeartbeat$,
+      // receivedUiHeartbeat$,
 
       // Machine selection
       selected,
       select: setSelected,
       unselect: () => setSelected(null),
 
-      notifySentHeartbeat: () => state.heartbeat$.next(Math.random()),
-      notifyReceivedHeartbeat: id => state.receivedHeartbeat$.next(id)
+      // notifyUiReceivedHeartbeat: id => receivedUiHeartbeat$.next(id)
     }}>
       { props.children }
     </MachineContext.Provider>

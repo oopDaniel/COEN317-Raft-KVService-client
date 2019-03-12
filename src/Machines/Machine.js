@@ -26,8 +26,6 @@ function Machine (props) {
     machineInfo$,
     leader,
     liveness,
-    heartbeat$,
-    notifyReceivedHeartbeat
   } = useContext(MachineContext)
   const isSelected = selected === id
   const isAlive = liveness[id]
@@ -47,8 +45,7 @@ function Machine (props) {
   useEffect(() => { renderDonut() }, [])
 
   // Reset timer (update donut) when received heartbeat
-  const receivedHeartbeat = useObservable(() => heartbeat$)
-  useEffect(() => { updateDonut() }, [receivedHeartbeat, isAlive, timer])
+  useEffect(() => { updateDonut() }, [isAlive, timer])
 
   // Store the position to context, so msg can use it
   useEffect(() => {
@@ -81,7 +78,6 @@ function Machine (props) {
   function updateDonut (donut) {
     // console.log('update donut')
     // Only the initialized call will pass donut instance to this function
-    const isFromHeartbeat = donut === undefined
     donut = timeoutDonut || donut
     if (!donut) return
 
@@ -109,7 +105,6 @@ function Machine (props) {
       donut.transition()
         .duration(300)
         .attrTween('d', arcTween(radio * PI_2))
-        .on('end', () => isFromHeartbeat && notifyReceivedHeartbeat(id))
 
       setD3Interval(
         d3.interval(() => {
