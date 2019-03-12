@@ -18,14 +18,16 @@ function useCommandCollector (id) {
   const {
     command$,
     commandValid$,
-    leader
+    leader,
+    liveness
   } = useContext(MachineContext)
+  const isAlive = liveness[id]
   const leaderCommand = useObservable(() => command$, '')
   const followerCommand = useObservable(() => commandValid$, '')
   const cmd = leader && id === leader.id
     ? leaderCommand
     : followerCommand
-  return cmd
+  return isAlive ? cmd : undefined
 }
 
 export default AppliedCommand
