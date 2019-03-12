@@ -1,7 +1,11 @@
 import React, { useEffect, useRef, useContext, useState } from 'react';
-import { FaDatabase, FaCrown } from 'react-icons/fa';
+import { useObservable } from 'rxjs-hooks';
+import { share, filter, map } from 'rxjs/operators';
 import * as d3 from 'd3'
+import * as R from 'ramda'
+import { FaDatabase, FaCrown } from 'react-icons/fa';
 import { getInfo } from '../shared/api'
+import { exist } from '../shared/utils'
 import MachineContext from '../shared/context/MachineContext'
 import AppliedCommand from './AppliedCommand/AppliedCommand'
 import './Machine.css'
@@ -16,8 +20,6 @@ const arc = d3.arc()
 function Machine (props) {
   const { id, ip } = props
 
-  const timer = useFollowerTimer(id)
-  const PORTION_PER_SEC = DONUT_UPDATE_INTERVAL / timer
   // Machine state related
   const {
     selected,
@@ -26,13 +28,25 @@ function Machine (props) {
     machineInfo$,
     leader,
     liveness,
+    sockets,
   } = useContext(MachineContext)
+
   const isSelected = selected === id
   const isAlive = liveness[id]
   const selectMachine = () => {
     if (id === selected) unselect()
     else select(id)
   }
+
+  const raft$ = sockets.find(s => s.id === id).io$.pipe(
+    filter(exist),
+    share()
+  )
+  const newTimer = useObservable(() => raft$.pipe(
+    filter(R.has('timer')),
+    map(R.compose(R.multiply(1000), R.prop('timer')))
+  ), Number.MAX_SAFE_INTEGER)
+  const PORTION_PER_SEC = DONUT_UPDATE_INTERVAL / newTimer
 
   // Update log for the selected machine
   useLogUpdater(isSelected, props)
@@ -45,7 +59,7 @@ function Machine (props) {
   useEffect(() => { renderDonut() }, [])
 
   // Reset timer (update donut) when received heartbeat
-  useEffect(() => { updateDonut() }, [isAlive, timer])
+  useEffect(() => { updateDonut() }, [isAlive, newTimer])
 
   // Store the position to context, so msg can use it
   useEffect(() => {
@@ -213,18 +227,4 @@ function useLogUpdater (isSelected, props) {
   }, [isSelected])
 }
 
-function useFollowerTimer (id) {
-  const [timer, setTimer] = useState(Number.MAX_SAFE_INTEGER)
-  const { followerTimer$ } = useContext(MachineContext)
-
-  useEffect(() => {
-    const { unsubscribe } = followerTimer$.subscribe(newTimerSet => {
-      if (newTimerSet && newTimerSet[id]) setTimer(newTimerSet[id])
-    })
-    return unsubscribe
-  }, [followerTimer$])
-
-  return timer
-}
-
-export default Machine;
+export default Machine

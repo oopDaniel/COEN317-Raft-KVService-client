@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useObservable } from 'rxjs-hooks'
-import io from 'socket.io-client'
+import socketIO from 'socket.io-client'
 import * as R from 'ramda'
 import  {
   BehaviorSubject,
@@ -17,7 +17,6 @@ import {
   debounceTime,
   bufferCount,
   map,
-  take,
   startWith,
   first,
   share,
@@ -34,53 +33,50 @@ import { getInfo } from '../api'
 import { mapIndexed, exist } from '../utils'
 import { KNOWN_SERVER_IPS, HEARTBEAT_INTERVAL } from '../constants'
 
-// Handle sockets
-const sockets = KNOWN_SERVER_IPS.map((ip, index) => ({
-  ip,
-  io: io(ip),
-  id: String.fromCharCode(65 + index), // id increases with index and starts from 'A'
-}))
-
-// Connection$: indicate alive machines
-const connections$ = sockets.map(
-  socket => fromEvent(socket.io, 'connect').pipe(
-    map(_ => R.pick(['id', 'ip'], socket)),
-    first()
-  )
-)
-const connectionReplaySubject = new ReplaySubject().pipe(share())
-forkJoin(...connections$)
-  .pipe(first()) // only need to recognize available machines once
-  .subscribe(connectionReplaySubject)
-
-// Pipe socket events into streams
+// Use `broadcastingEntries` to identify leader
 const setLeaderFlag = R.when(
   R.propEq('type', 'broadcastingEntries'),
   R.assoc('leader', true)
 )
 
-const rawIo$ = combineLatest(...sockets.map(
-  socket => fromEvent(socket.io, 'raftEvent').pipe(
-    // tap(q => console.log('<socks>', q)),
-    map(R.compose(
-      setLeaderFlag,
-      e => R.mergeAll([R.pick(['id', 'ip'], socket), e])
-    )),
-    startWith(null)
-  )
-))
+// Handle sockets
+const sockets = KNOWN_SERVER_IPS.map((ip, index) => {
+  const id = String.fromCharCode(65 + index) // id increases with index and starts from 'A'
+  const io = socketIO(ip)
+  const identityObj = { id, ip }
+  return {
+    ...identityObj,
+    io,
+    conn$: fromEvent(io, 'connect').pipe(
+      map(_ => identityObj),
+      first(),
+    ),
+    io$: fromEvent(io, 'raftEvent').pipe(
+      // tap(q => console.log('<socks>', q)),
+      map(R.compose(
+        setLeaderFlag,
+        e => R.mergeAll([identityObj, e])
+      )),
+      startWith(null) // Indicate socket exists
+    )
+  }
+})
+
+// Connection$: indicate alive machines
+const connections$ = sockets.map(so => so.conn$)
+const connectionReplaySubject = new ReplaySubject().pipe(share())
+forkJoin(...connections$)
+  .pipe(first()) // only need to recognize available machines once
+  .subscribe(connectionReplaySubject)
+
+const rawIo$ = sockets.map(socket => socket.io$)
+const rawIoMerged$ = combineLatest(...rawIo$)
 
 const rawIoWithTimeout$ = combineLatest(...sockets.map(
   socket =>
     timer(0, HEARTBEAT_INTERVAL).pipe(
       concatMapTo(race(
-        fromEvent(socket.io, 'raftEvent').pipe(
-          map(R.compose(
-            setLeaderFlag,
-            e => R.mergeAll([R.pick(['id', 'ip'], socket), e])
-          )),
-          take(1) // so that streams ends, next time will be a fresh race
-        ),
+        socket.io$,
         of({ id: socket.id, ip: socket.ip, timeout: true })
           .pipe(delay(HEARTBEAT_INTERVAL)) // Somehow necessary
       ))
@@ -92,7 +88,7 @@ const io$ = rawIoWithTimeout$.pipe(
   filter(R.complement(R.all(R.isNil))),
 )
 
-rawIoWithTimeout$.subscribe(e => console.log('%c[IO event]', 'color:lightgreen;font-size:1.2em', e))
+// rawIoWithTimeout$.subscribe(e => console.log('%c[IO event]', 'color:lightgreen;font-size:1.2em', e))
 
 // Liveness of machines
 const machineLivenessSubjects = sockets.map(socket => ({ ...socket, sub: new BehaviorSubject(true) }))
@@ -111,7 +107,8 @@ const liveness$ = mergedMachineLiveness$.pipe(
 // Stream of current leader
 const isLeader = R.propEq('leader', true)
 const filterBasedOnLiveness = ([leader, liveness]) => liveness[leader.index].alive ? leader : null
-const leaderHeartbeat$ = io$.pipe(
+const leaderHeartbeat$ = rawIoMerged$.pipe(
+  filter(R.any(R.both(exist, isLeader))),
   map(R.compose(
     R.head,
     R.filter(isLeader),
@@ -156,7 +153,7 @@ const followerTimer$ = io$.pipe(
 )
 
 // Command related
-const command$ = rawIo$.pipe(
+const command$ = rawIoMerged$.pipe(
   map(R.compose(
     R.head,
     R.filter(R.propEq('type', 'commandReceived')),
@@ -245,6 +242,8 @@ export function MachineProvider (props) {
       command$,
       commandValid$,
 
+      // For single machine sync donut
+      sockets,
       // TODO
       // uiHeartbeat$,
       // receivedUiHeartbeat$,
