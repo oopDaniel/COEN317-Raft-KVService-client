@@ -1,0 +1,7 @@
+.applied-cmd {
+  font-size: .5em;
+  padding: .4rem .5rem;
+  border: 1px solid lightgrey;
+  border-radius: 2px;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
+}

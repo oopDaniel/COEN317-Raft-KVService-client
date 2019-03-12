@@ -50,3 +50,13 @@
   color: orange;
 }
 
+.cmd {
+  position: absolute;
+  top: 50%;
+  left: 100%;
+}
+
+.cmd.left {
+  /* TODO: maybe tune the position? */
+  /* left: -50%; */
+}

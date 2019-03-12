@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useContext, useState } from 'react';
-import { useObservable } from 'rxjs-hooks';
 import { FaDatabase, FaCrown } from 'react-icons/fa';
 import * as d3 from 'd3'
 import { getInfo } from '../shared/api'
 import MachineContext from '../shared/context/MachineContext'
-import './Machine.css';
+import AppliedCommand from './AppliedCommand/AppliedCommand'
+import './Machine.css'
 
 const DONUT_UPDATE_INTERVAL = 600
 const PI_2 = 2 * Math.PI
@@ -137,6 +137,9 @@ function Machine (props) {
           <FaDatabase/>
         </div>
         <span className="machine-id">{id}</span>
+        <div className={`cmd ${id === 'A' ? 'left' : ''}`}>
+          <AppliedCommand id={id}/>
+        </div>
       </div>
     </div>
   );

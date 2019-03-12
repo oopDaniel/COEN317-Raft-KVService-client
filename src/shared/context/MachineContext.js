@@ -3,7 +3,6 @@ import { useObservable } from 'rxjs-hooks'
 import io from 'socket.io-client'
 import * as R from 'ramda'
 import  {
-  Subject,
   BehaviorSubject,
   ReplaySubject,
   fromEvent,
@@ -19,6 +18,7 @@ import {
   bufferCount,
   map,
   take,
+  startWith,
   first,
   share,
   filter,
@@ -28,6 +28,7 @@ import {
   delay,
   concatMap,
   concatMapTo,
+  withLatestFrom,
 } from 'rxjs/operators'
 import { getInfo } from '../api'
 import { mapIndexed, exist } from '../utils'
@@ -59,39 +60,39 @@ const setLeaderFlag = R.when(
 )
 
 const rawIo$ = combineLatest(...sockets.map(
+  socket => fromEvent(socket.io, 'raftEvent').pipe(
+    // tap(q => console.log('<socks>', q)),
+    map(R.compose(
+      setLeaderFlag,
+      e => R.mergeAll([R.pick(['id', 'ip'], socket), e])
+    )),
+    startWith(null)
+  )
+))
+
+const rawIoWithTimeout$ = combineLatest(...sockets.map(
   socket =>
     timer(0, HEARTBEAT_INTERVAL).pipe(
       concatMapTo(race(
         fromEvent(socket.io, 'raftEvent').pipe(
-          // tap(q => console.log('socks', q)),
           map(R.compose(
             setLeaderFlag,
             e => R.mergeAll([R.pick(['id', 'ip'], socket), e])
           )),
           take(1) // so that streams ends, next time will be a fresh race
         ),
-        of('timeout').pipe(delay(HEARTBEAT_INTERVAL)) // Somehow necessary
+        of({ id: socket.id, ip: socket.ip, timeout: true })
+          .pipe(delay(HEARTBEAT_INTERVAL)) // Somehow necessary
       ))
     )
 )).pipe(share())
 
-const io$ = rawIo$.pipe(
+const io$ = rawIoWithTimeout$.pipe(
   debounceTime(1000),
   filter(R.complement(R.all(R.isNil))),
 )
 
-const command$ = rawIo$.pipe(
-  map(R.compose(
-    R.head,
-    R.filter(R.propEq('type', 'commandReceived')),
-    // Need index to find correct observable of liveness for filtering
-    mapIndexed((v, index) => ({ ...v, index }))
-  )),
-  filter(exist),
-  debounceTime(1000)
-)
-
-rawIo$.subscribe(e => console.log('%c[IO event]', 'color:lightgreen;font-size:1.2em', e))
+rawIoWithTimeout$.subscribe(e => console.log('%c[IO event]', 'color:lightgreen;font-size:1.2em', e))
 
 // Liveness of machines
 const machineLivenessSubjects = sockets.map(socket => ({ ...socket, sub: new BehaviorSubject(true) }))
@@ -145,14 +146,42 @@ const leader$ = combineLatest(
 const followerTimer$ = io$.pipe(
   map(R.compose(
     R.reduce((m, e) => {
-      m[e.id] = e.timer * 1000 // sec to ms
+      m[e.id] = (e.timeout || e.timer === undefined) ? -1 : e.timer * 1000 // sec to ms
       return m
     }, {}),
-    R.reject(R.either(isLeader, R.complement(R.has('id')))),
+    R.reject(R.anyPass([isLeader, R.complement(R.has('id'))])),
     // Need index to find correct observable of liveness for filtering
     mapIndexed((v, index) => ({ ...v, index }))
   ))
 )
+
+// Command related
+const command$ = rawIo$.pipe(
+  map(R.compose(
+    R.head,
+    R.filter(R.propEq('type', 'commandReceived')),
+    // Need index to find correct observable of liveness for filtering
+    mapIndexed((v, index) => ({ ...v, index }))
+  )),
+  filter(exist),
+  debounceTime(1000),
+  tap(e => console.log('\tcmd received', e))
+)
+
+
+const commandValid$ = followerTimer$.pipe(
+  withLatestFrom(command$),
+  map(([timerMap, cmd]) => {
+    const cmdSet = { ...cmd, applied: [] }
+    R.keys(timerMap).forEach(id => {
+      if (timerMap[id] !== -1) cmdSet.applied.push(id)
+    })
+    return cmdSet
+  }),
+  distinctUntilKeyChanged('cmd')
+)
+
+commandValid$.subscribe(e => console.log('%cvalid comnd ', 'color:green;font-size:2rem',e))
 
 // Machine info
 const machineInfo$ = new ReplaySubject(5).pipe(
@@ -214,6 +243,7 @@ export function MachineProvider (props) {
 
       // Command
       command$,
+      commandValid$,
 
       // TODO
       // uiHeartbeat$,
