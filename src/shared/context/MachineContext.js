@@ -36,10 +36,11 @@ import { KNOWN_SERVER_IPS, HEARTBEAT_INTERVAL } from '../constants'
 
 // Use `broadcastingEntries` to identify leader
 const setLeaderFlag = R.when(
-  R.either(
+  R.anyPass([
     R.propEq('type', 'broadcastingEntries'),
-    R.propEq('type', 'commandReceived')
-  ),
+    R.propEq('type', 'commandReceived'),
+    R.propEq('to', 'L'),
+  ]),
   R.assoc('leader', true)
 )
 
@@ -56,12 +57,11 @@ const sockets = KNOWN_SERVER_IPS.map((ip, index) => {
       first(),
     ),
     io$: fromEvent(io, 'raftEvent').pipe(
-      tap(q => console.log('<socks>', q)),
+      // tap(q => console.log('<socks>', q)),
       map(R.compose(
         setLeaderFlag,
         e => R.mergeAll([identityObj, e])
       )),
-      share(),
       startWith(null), // Indicate socket exists
     )
   }

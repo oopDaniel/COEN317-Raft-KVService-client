@@ -83,7 +83,7 @@ function Machine (props) {
   const newTimer = useObservable(() => receivedUiHeartbeat$.pipe(
     startWith(null),
     withLatestFrom(raft$.current.pipe(
-      filter(R.has('timer')), // TODO: also filter by event type
+      filter(R.both(R.has('timer'), R.propEq('type', 'heartbeatReceived'))),
       map(toUnifiedTimer),
       debounceTime(100),
       startWith(Number.MAX_SAFE_INTEGER)
