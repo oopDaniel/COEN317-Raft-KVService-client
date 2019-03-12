@@ -15,7 +15,7 @@ function Sidebar ({ customClass }) {
     selected,
     liveness,
     toggleMachine,
-    machineInfo,
+    machinePosMeta,
     receivedUiHeartbeatAndAck$,
    } = useContext(MachineContext)
   const hasSelected = selected !== null
@@ -52,7 +52,7 @@ function Sidebar ({ customClass }) {
 
     open(hint)
     try {
-      await callApi(machineInfo[selected].ip)
+      await callApi(machinePosMeta[selected].ip)
       toggleMachine()
       open(postHint)
     } catch (e) {
@@ -67,8 +67,8 @@ function Sidebar ({ customClass }) {
     newCommand.server = selected
     setCommands([...commands, newCommand])
     const promise = newCommand.operation === 'GET'
-      ? getState(machineInfo[selected].ip, newCommand.data.key)
-      : putState(machineInfo[selected].ip, newCommand.data)
+      ? getState(machinePosMeta[selected].ip, newCommand.data.key)
+      : putState(machinePosMeta[selected].ip, newCommand.data)
     return Promise.all([promise, receivedUiHeartbeatAndAck$.toPromise()]).then(R.nth(0))
   }
 

@@ -56,12 +56,13 @@ const sockets = KNOWN_SERVER_IPS.map((ip, index) => {
       first(),
     ),
     io$: fromEvent(io, 'raftEvent').pipe(
-      // tap(q => console.log('<socks>', q)),
+      tap(q => console.log('<socks>', q)),
       map(R.compose(
         setLeaderFlag,
         e => R.mergeAll([identityObj, e])
       )),
-      startWith(null) // Indicate socket exists
+      share(),
+      startWith(null), // Indicate socket exists
     )
   }
 })
@@ -184,7 +185,7 @@ const commandValid$ = followerTimer$.pipe(
 commandValid$.subscribe(e => console.log('%cvalid comnd ', 'color:green;font-size:2rem',e))
 
 // Machine info
-const machineInfo$ = new ReplaySubject(5).pipe(
+const machinePosMeta$ = new ReplaySubject(5).pipe(
   bufferCount(5),
   map(pos => pos.reduce((map, pos) => (map[pos.id] = pos) && map, {})),
   first(),
@@ -195,12 +196,10 @@ const machineInfo$ = new ReplaySubject(5).pipe(
 const uiHeartbeat$ = new Subject().pipe(debounceTime(50))
 const receivedUiHeartbeat$ = new Subject()
 const receivedUiAck$ = new Subject()
-
 const anyFollowerTimer$ = rawIoMerged$.pipe(
   filter(R.any(isExistentAndNotLeader)),
   map(R.find(isExistentAndNotLeader)),
 )
-
 const receivedUiHeartbeatAndAck$ = receivedUiAck$.pipe(
   startWith(null),
   withLatestFrom(receivedUiHeartbeat$.pipe(
@@ -215,6 +214,9 @@ const receivedUiHeartbeatAndAck$ = receivedUiAck$.pipe(
   first()
 )
 
+// Follower starts leader election
+const candidate$ = new Subject()
+
 const MachineContext = React.createContext()
 
 export function MachineProvider (props) {
@@ -223,7 +225,7 @@ export function MachineProvider (props) {
 
   // ID, IP, positions on page, etc.
   const machines = useObservable(() => connectionReplaySubject, []) // 2nd arg: default value
-  const machineInfo = useObservable(() => machineInfo$)
+  const machinePosMeta = useObservable(() => machinePosMeta$)
 
   const liveness = useObservable(() => liveness$)
 
@@ -242,8 +244,8 @@ export function MachineProvider (props) {
 
       // Machines and their info
       machines,
-      machineInfo$, // Subject to emit data
-      machineInfo, // Parsed data
+      machinePosMeta$, // Subject to emit data
+      machinePosMeta, // Parsed data
 
       // Machine state
       machineLivenessSubjectMap,
@@ -260,6 +262,7 @@ export function MachineProvider (props) {
       leaderHeartbeat$,
       leaderHeartbeatWithCommand$,
       followerTimer$,
+      candidate$,
 
       // Command
       command$,

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useContext, useState } from 'react';
 import { useObservable } from 'rxjs-hooks';
-import { share, filter, map, withLatestFrom, startWith, debounceTime } from 'rxjs/operators';
+import { share, filter, map, withLatestFrom, startWith, debounceTime, distinctUntilKeyChanged } from 'rxjs/operators';
 import * as d3 from 'd3'
 import * as R from 'ramda'
 import { FaDatabase, FaCrown } from 'react-icons/fa';
@@ -10,6 +10,7 @@ import MachineContext from '../shared/context/MachineContext'
 import AppliedCommand from './AppliedCommand/AppliedCommand'
 import './Machine.css'
 
+const toUnifiedTimer = R.compose(R.multiply(1000), R.prop('timer'))
 const DONUT_UPDATE_INTERVAL = 600
 const PI_2 = 2 * Math.PI
 const arc = d3.arc()
@@ -25,12 +26,13 @@ function Machine (props) {
     selected,
     select,
     unselect,
-    machineInfo$,
+    machinePosMeta$,
     leader,
     liveness,
     sockets,
     receivedUiHeartbeat$,
     command$,
+    candidate$,
   } = useContext(MachineContext)
 
   const isSelected = selected === id
@@ -40,6 +42,7 @@ function Machine (props) {
     else select(id)
   }
 
+  // Show cmd on a machine if there's any valid one
   const [cmd, setCmd] = useState(null)
   useEffect(() => {
     const { unsubscribe } = command$
@@ -51,11 +54,37 @@ function Machine (props) {
     return R.tryCatch(unsubscribe)
   }, [command$, leader])
 
+  // Raft event from socket specifying to this machine
+  const raft$ = useRef(sockets.find(s => s.id === id).io$.pipe(
+    filter(exist),
+    share()
+  ))
+  const stateChange$ = useRef(raft$.current.pipe(
+    filter(R.propEq('type', 'stateChanged')),
+    distinctUntilKeyChanged('from'),
+    share()
+  ))
+
+  // Candidate requestVote timer
+  const newCandidateTimer = useObservable(() => candidate$.pipe(
+    filter(R.propEq('id', id)),
+    map(toUnifiedTimer)
+  ), null)
+
+  const newLeaderElected = useObservable(() => stateChange$.current.pipe(
+    filter(R.propEq('to', 'L')),
+    distinctUntilKeyChanged('id'),
+  ), null)
+
+  // Broadcast if machine becomes candidate
+  useFollowerToCandidateBroadcaster(stateChange$.current, candidate$)
+
+  // Update timer when received heartbeat and the msg circle reached machine on the UI
   const newTimer = useObservable(() => receivedUiHeartbeat$.pipe(
     startWith(null),
-    withLatestFrom(raft$.pipe(
-      filter(R.has('timer')),
-      map(R.compose(R.multiply(1000), R.prop('timer'))),
+    withLatestFrom(raft$.current.pipe(
+      filter(R.has('timer')), // TODO: also filter by event type
+      map(toUnifiedTimer),
       debounceTime(100),
       startWith(Number.MAX_SAFE_INTEGER)
     )),
@@ -68,17 +97,10 @@ function Machine (props) {
     )
   )))
 
-  const raft$ = sockets.find(s => s.id === id).io$.pipe(
-    filter(exist),
-    share()
-  )
-
   // Update log for the selected machine
   useLogUpdater(isSelected, props)
 
-  // Need Ref of db icon to locate the position of messages
-  const dbIconRef = useRef(null)
-
+  // Donut related
   const [timeoutDonut, setTimeoutDonut] = useState(null)
   const [d3Interval, setD3Interval] = useState(null)
   useEffect(() => { renderDonut() }, [])
@@ -86,10 +108,25 @@ function Machine (props) {
   // Reset timer (update donut) when received heartbeat
   useEffect(() => { updateDonut() }, [isAlive, newTimer])
 
+  // Reset timer (update donut) when start election
+  useEffect(() => {
+    if (newCandidateTimer) {
+      resetDonut()
+      updateDonut(undefined, newCandidateTimer)
+    }
+  }, [newCandidateTimer])
+
+  useEffect(() => {
+    newLeaderElected && resetDonut(true)
+  }, [newLeaderElected])
+
+
+  // Need Ref of db icon to locate the position of messages
+  const dbIconRef = useRef(null)
   // Store the position to context, so msg can use it
   useEffect(() => {
     const pos = getIconPosition(dbIconRef.current)
-    machineInfo$.next({ id, ip, ...pos })
+    machinePosMeta$.next({ id, ip, ...pos })
   }, [])
 
   function renderDonut () {
@@ -114,7 +151,7 @@ function Machine (props) {
     updateDonut(donut)
   }
 
-  function updateDonut (donut) {
+  function updateDonut (donut, electionTimer = null) {
     // Only the initialized call will pass donut instance to this function
     donut = timeoutDonut || donut
     if (!donut) return
@@ -126,29 +163,52 @@ function Machine (props) {
     }
 
     const isAlive = liveness[id]
-    if (!isAlive || (leader && leader.id === id)) {
+    if (!isAlive) {
       donut.transition()
-        .duration(0)
+        .duration(100)
         .attrTween('d', arcTween(0))
       return
     }
 
-    const PORTION_PER_SEC = DONUT_UPDATE_INTERVAL / newTimer
+    const PORTION_PER_SEC = DONUT_UPDATE_INTERVAL / ((electionTimer || newTimer) - 500)
 
     // Start from a full donut
     let radio = 1
     donut.transition()
+      .style('fill', electionTimer ? 'var(--election-timeout-track)' : 'var(--timeout-track)')
       .duration(300)
       .attrTween('d', arcTween(radio * PI_2))
 
-    setD3Interval(
-      d3.interval(() => {
-        radio = Math.max(0, radio - PORTION_PER_SEC)
-        donut.transition()
-          .duration(DONUT_UPDATE_INTERVAL)
-          .attrTween('d', arcTween(radio * PI_2))
-        }, DONUT_UPDATE_INTERVAL)
-    )
+    const itv = d3.interval(() => {
+      radio = Math.max(0, radio - PORTION_PER_SEC)
+      donut.transition()
+        .duration(DONUT_UPDATE_INTERVAL)
+        .attrTween('d', arcTween(radio * PI_2))
+      if (radio === 0) {
+        setD3Interval(null)
+        itv.stop()
+      }
+      }, DONUT_UPDATE_INTERVAL)
+    setD3Interval(itv)
+  }
+
+  function resetDonut (hasBecomeLeader = false) {
+    if (!timeoutDonut) return
+    if (d3Interval) {
+      d3Interval.stop()
+      setD3Interval(null)
+    }
+    if (hasBecomeLeader) {
+      timeoutDonut.transition()
+        .style('fill', 'var(--timeout-track)')
+        .duration(100)
+        .attrTween('d', arcTween(PI_2))
+    } else {
+      timeoutDonut.transition()
+        .duration(100)
+        .attrTween('d', arcTween(0))
+    }
+
   }
 
   return (
@@ -252,6 +312,17 @@ function useLogUpdater (isSelected, props) {
         .then(({ data }) => updateLog(id, data))
     }
   }, [isSelected])
+}
+
+function useFollowerToCandidateBroadcaster (stateChange$, candidate$) {
+  useEffect(() => {
+    const toCandidate$ = stateChange$.pipe(
+      filter(R.propEq('to', 'C')),
+      distinctUntilKeyChanged('id'),
+    )
+    const { unsubscribe } = toCandidate$.subscribe(candidate$)
+    return unsubscribe
+  }, [stateChange$])
 }
 
 export default Machine
