@@ -1,31 +1,25 @@
-import React, { useEffect, useContext, useState, useRef } from 'react';
+import React, { useEffect, useContext, useRef } from 'react'
+import { BehaviorSubject, combineLatest } from 'rxjs'
+import { withLatestFrom, map } from 'rxjs/operators'
+import { useObservable } from 'rxjs-hooks'
 import * as d3 from 'd3'
 import * as R from 'ramda'
 import MachineContext from '../../shared/context/MachineContext'
-// import { usePrevious } from '../../shared/utils'
 import { MSG_SINGLE_TRIP_TIME } from '../../shared/constants'
-// import { exist } from '../../shared/utils'
-import './MessageMap.css';
-import { useObservable } from 'rxjs-hooks';
-import { withLatestFrom, map, tap } from 'rxjs/operators';
-import { BehaviorSubject, combineLatest } from 'rxjs';
+import './MessageMap.css'
 
 
 function MessageMap () {
   const {
-    machinePosMeta: positionMap,
     liveness$,
-    // leader,
     machinePosMeta$,
-    // existentLeader$,
-    // prevExistentLeader$,
-    liveness,
     leaderHeartbeatWithCommand$: leaderHeartbeat$,
     receivedUiHeartbeat$,
     receivedUiAck$,
     candidate$,
   } = useContext(MachineContext)
 
+  // Animation of sending heartbeat and replying with ack
   const sendingMsg$ = useRef(new BehaviorSubject(false))
   useEffect(() => {
     const hbSub = leaderHeartbeat$.pipe(
@@ -46,17 +40,21 @@ function MessageMap () {
     })
   }, [])
 
-  const newCandidate = useObservable(() => candidate$, null)
+  // Animation of starting an election
+  const newCandidateArgs = useObservable(() => candidate$.pipe(
+    withLatestFrom(combineLatest(liveness$, machinePosMeta$)),
+    map(R.flatten)
+  ), [])
   useEffect(() => {
-    if (newCandidate) sendVoteRequest(newCandidate.id)
-  }, [newCandidate])
+    if (newCandidateArgs && newCandidateArgs[0]) sendVoteRequest(newCandidateArgs)
+  }, [newCandidateArgs])
 
   function sendHeartbeatMsg ([heartbeat, liveness, positionMap, hasSendingMsg]) {
     const { cmd, id } = heartbeat
     if (!liveness[id] || hasSendingMsg) return
     const { x: leaderX, y: leaderY } = positionMap[id]
 
-    // Like a critical section... unlock after ack reached leader
+    // Like a critical section... 😂 unlock after ack reached leader
     sendingMsg$.current.next(true)
 
     const msgSvg = d3.select('svg.msg-svg')
@@ -78,16 +76,16 @@ function MessageMap () {
       .attr('cy', d => d.y)
       .transition()
       .duration(0)
-      .style('fill', 'var(--msg-ack')
+      .style('fill', 'var(--msg-ack)')
       .on('end', _ => {
-        const payload = { circles, heartbeat, liveness, positionMap }
+        const payload = { circles, target: heartbeat, liveness, positionMap }
         if (cmd) payload.cmd = cmd
         receivedUiHeartbeat$.next(payload)
       })
   }
 
-  function replyAck ({ circles, heartbeat, liveness, positionMap }) {
-    const { x: leaderX, y: leaderY } = positionMap[R.prop('id', heartbeat)]
+  function replyAck ({ circles, target, liveness, positionMap, voteRequest }) {
+    const { x: leaderX, y: leaderY } = positionMap[R.prop('id', target)]
     circles
       .filter(d => liveness[d.id])
       .transition()
@@ -95,20 +93,27 @@ function MessageMap () {
       .attr('cx', leaderX)
       .attr('cy', leaderY)
       .on('end', _ => {
-        sendingMsg$.current.next(false) // Unlock
-        receivedUiAck$.next(true) // So we can show the replicate command
+        if (voteRequest === undefined) {
+          sendingMsg$.current.next(false) // Unlock
+          receivedUiAck$.next(true) // So we can show the replicate command
+        }
       })
   }
 
-  function sendVoteRequest (id) {
+  function sendVoteRequest ([candidate, liveness, positionMap]) {
+    const { id } = candidate
+    const { x: candidateX, y: candidateY } = positionMap[id]
+
     const msgSvg = d3.select('svg.msg-svg')
-    msgSvg.selectAll('circle').remove()
+
+    // Note: no need to remove circles here.
+    // voteRequst can coexist with legacy heartbeat
+
     const circles = msgSvg.selectAll('.circleGroups')
       .data(R.values(R.omit([id], positionMap)))
       .enter()
       .append('circle')
 
-    const { x: candidateX, y: candidateY } = positionMap[id]
     circles
       .attr('r', 10)
       .attr('cx', candidateX)
@@ -118,22 +123,20 @@ function MessageMap () {
       .duration(MSG_SINGLE_TRIP_TIME)
       .attr('cx', d => d.x)
       .attr('cy', d => d.y)
-      // .on('end', _ => receivedUiHeartbeat$.next({ voteRequest: true }))
-      .filter(d => liveness[d.id])
-      .transition()
-      .duration(0)
-      .style('fill', 'var(--msg-ack')
-      .transition()
-      .duration(MSG_SINGLE_TRIP_TIME)
-      .attr('cx', candidateX)
-      .attr('cy', candidateY)
+      .on('end', _ => receivedUiHeartbeat$.next({
+        target: candidate,
+        circles,
+        liveness,
+        positionMap,
+        voteRequest: true
+      }))
   }
 
   return (
     <div className="message-map">
       <svg className="msg-svg"></svg>
     </div>
-  );
+  )
 }
 
-export default MessageMap;
+export default MessageMap
