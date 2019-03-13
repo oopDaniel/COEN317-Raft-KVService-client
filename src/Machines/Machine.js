@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useContext, useState } from 'react'
 import { useObservable } from 'rxjs-hooks'
-import { of } from 'rxjs'
-import { share, tap, switchMap, filter, map, startWith, debounceTime, distinctUntilChanged, distinctUntilKeyChanged } from 'rxjs/operators'
+import { merge } from 'rxjs'
+import { share, tap, filter, map, buffer, withLatestFrom, startWith, distinctUntilChanged, distinctUntilKeyChanged, throttleTime } from 'rxjs/operators'
 import * as d3 from 'd3'
 import * as R from 'ramda'
 import { FaDatabase, FaCrown } from 'react-icons/fa'
@@ -12,7 +12,7 @@ import MachineContext from '../shared/context/MachineContext'
 import AppliedCommand from './AppliedCommand/AppliedCommand'
 import './Machine.css'
 
-const getRandomTimeout = () => Math.random() * ELECTION_DURATION_DIFF + ELECTION_DURATION_MIN
+const getRandomTimeout = () => ~~(Math.random() * ELECTION_DURATION_DIFF + ELECTION_DURATION_MIN)
 const DONUT_UPDATE_INTERVAL = 600
 const PI_2 = 2 * Math.PI
 const arc = d3.arc()
@@ -31,6 +31,7 @@ function Machine (props) {
     machinePosMeta$,
     leader,
     liveness,
+    liveness$,
     sockets,
     receivedUiHeartbeat$,
     command$,
@@ -88,26 +89,33 @@ function Machine (props) {
   // Broadcast if machine becomes candidate
   useFollowerToCandidateBroadcaster(stateChange$.current, candidate$)
 
-  // Update timer when received heartbeat and the msg circle reached machine on the UI
-  const newTimer = useObservable(() => receivedUiHeartbeat$.pipe(
-    tap(x => log.log(`[${id}]`, 'received UI heartbeat', x)),
-    tap(R.when(
-      R.both(exist, R.has('cmd')), // receive a heartbeat with cmd
-      R.compose(setCmd, R.prop('cmd'))
-    )),
-    switchMap(R.ifElse(
-      R.both(exist, R.has('voteRequest')),
-      () => of(getRandomTimeout()),
-      () => raft$.current.pipe(
-        filter(R.both(R.has('timer'), R.propEq('type', 'heartbeatReceived'))),
-        map(R.prop('timer')),
-        debounceTime(2500),
-        distinctUntilChanged(),
-        startWith(getRandomTimeout())
-      )
-    )),
+
+  // Update timer ONLY when both received heartbeat from socket and the msg
+  // circle reached the follower on the UI, unless it's a voteRequest.
+  const newTimer = useObservable(() => merge(
+    receivedUiHeartbeat$.pipe(
+      tap(R.when(
+        R.both(exist, R.has('cmd')), // receive a heartbeat with cmd
+        R.compose(setCmd, R.prop('cmd'))
+      )),
+      filter(R.both(exist, R.has('voteRequest'))),
+      withLatestFrom(liveness$),
+      filter(([_, liveness]) => liveness[id]),
+      map(getRandomTimeout),
+    ),
+    raft$.current.pipe(
+      filter(R.both(R.has('timer'), R.propEq('type', 'heartbeatReceived'))),
+      // tap(q => log.info(`%c<follower ${q.id}>`, 'color:yellow', q.timer)),
+      map(R.prop('timer')),
+      distinctUntilChanged(),
+      buffer(receivedUiHeartbeat$),
+      map(R.last)
+    )
+  ).pipe(
+    throttleTime(1000),
     startWith(getRandomTimeout())
   ))
+
 
   // Update logs of the selected machine
   useLogUpdater(isSelected, props)
@@ -169,12 +177,15 @@ function Machine (props) {
   function updateDonut (donut, electionTimer = null) {
     // Only the initialized call will pass donut instance to this function
     donut = timeoutDonut || donut
-    if (!donut) return
-
-    log.log(`[${id}] updating donut with timer ${electionTimer || newTimer} ${(electionTimer && '(election)') || ''}`)
 
     // If reset, the donut timer is invalid (leader or dead)
-    if (resetDonutAsNeeded()) return
+    if (R.or(
+      R.isNil(donut),
+      R.all(R.isNil)([electionTimer, newTimer]),
+      resetDonutAsNeeded()
+    )) return
+
+    log.log(`[${id}] updating donut with timer ${electionTimer || newTimer} ${(electionTimer && '(election)') || ''}`)
 
     // cleanup old interval
     if (d3Interval) {

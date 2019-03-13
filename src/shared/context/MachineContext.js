@@ -39,9 +39,10 @@ const setLeaderFlag = R.when(
   ]),
   R.assoc('leader', true)
 )
+const toInt = n => ~~n
 const unifyTimestamp = R.when(
   R.has('timer'),
-  R.evolve({timer: R.multiply(1000)})
+  R.evolve({timer: R.compose(toInt, R.multiply(1000))})
 )
 
 
@@ -143,7 +144,7 @@ const leader$ = combineLatest(allDistinctLeaderMsg$, liveness$).pipe(
 
 // Suppose heartbeat interval is 6 sec, 4 should be sufficient.
 const leaderHeartbeat$ = combineLatest(allLeaderMsg$, liveness$).pipe(
-  tap(e => log.log(`(${e[0] && e[0].id}) heartbeating. Liveness:`, e[1])),
+  // tap(e => log.log(`(${e[0] && e[0].id}) heartbeating. Liveness:`, e[1])),
   filter(([leader, liveness]) => leader && liveness[leader.id]),
   map(R.nth(0)),
   throttleTime(2000)
