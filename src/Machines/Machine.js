@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useContext, useState } from 'react';
 import { useObservable } from 'rxjs-hooks';
-import { share, filter, map, withLatestFrom, startWith, debounceTime, distinctUntilKeyChanged } from 'rxjs/operators';
+import { of } from 'rxjs';
+import { share, switchMap, filter, map, startWith, debounceTime, distinctUntilKeyChanged } from 'rxjs/operators';
 import * as d3 from 'd3'
 import * as R from 'ramda'
 import { FaDatabase, FaCrown } from 'react-icons/fa';
@@ -81,21 +82,23 @@ function Machine (props) {
 
   // Update timer when received heartbeat and the msg circle reached machine on the UI
   const newTimer = useObservable(() => receivedUiHeartbeat$.pipe(
-    startWith(null),
-    withLatestFrom(raft$.current.pipe(
-      filter(R.both(R.has('timer'), R.propEq('type', 'heartbeatReceived'))),
-      map(toUnifiedTimer),
-      debounceTime(100),
-      startWith(Number.MAX_SAFE_INTEGER)
-    )),
-    map(R.compose(
-      R.nth(1),
-      R.when(
-        R.compose(exist, R.head), // receive a heartbeat with cmd
-        R.tap(R.compose(setCmd, R.nth(0)))
-      )
-    )
-  )))
+    switchMap(R.ifElse(
+      R.both(exist, R.has('mockTimer')),
+      e => of(e).pipe(map(R.prop('mockTimer'))),
+      R.compose(
+        () => raft$.current.pipe(
+          filter(R.both(R.has('timer'), R.propEq('type', 'heartbeatReceived'))),
+          map(toUnifiedTimer),
+          debounceTime(100),
+        ),
+        R.when(
+          R.both(exist, R.has('cmd')), // receive a heartbeat with cmd
+          R.tap(setCmd)
+        )
+      ))
+    ),
+    startWith(Number.MAX_SAFE_INTEGER)
+  ))
 
   // Update log for the selected machine
   useLogUpdater(isSelected, props)
@@ -106,18 +109,21 @@ function Machine (props) {
   useEffect(() => { renderDonut() }, [])
 
   // Reset timer (update donut) when received heartbeat
-  useEffect(() => { updateDonut() }, [isAlive, newTimer])
+  useEffect(() => { updateDonut() }, [newTimer])
+
+  // Hide timer for leader or dead machine
+  useEffect(() => { resetDonutAsNeeded() }, [liveness, leader])
 
   // Reset timer (update donut) when start election
   useEffect(() => {
     if (newCandidateTimer) {
-      resetDonut()
+      resetDonutAsNeeded()
       updateDonut(undefined, newCandidateTimer)
     }
   }, [newCandidateTimer])
 
   useEffect(() => {
-    newLeaderElected && resetDonut(true)
+    newLeaderElected && resetDonutAsNeeded(true)
   }, [newLeaderElected])
 
 
@@ -162,14 +168,6 @@ function Machine (props) {
       setD3Interval(null)
     }
 
-    const isAlive = liveness[id]
-    if (!isAlive) {
-      donut.transition()
-        .duration(100)
-        .attrTween('d', arcTween(0))
-      return
-    }
-
     const PORTION_PER_SEC = DONUT_UPDATE_INTERVAL / ((electionTimer || newTimer) - 500)
 
     // Start from a full donut
@@ -192,23 +190,27 @@ function Machine (props) {
     setD3Interval(itv)
   }
 
-  function resetDonut (hasBecomeLeader = false) {
-    if (!timeoutDonut) return
-    if (d3Interval) {
-      d3Interval.stop()
-      setD3Interval(null)
+  function resetDonutAsNeeded (hasBecameLeader = false) {
+    const isAlive = liveness[id]
+    const isLeader = leader && leader.id === id
+    if (!isAlive || isLeader) {
+      if (d3Interval) {
+        d3Interval.stop()
+        setD3Interval(null)
+      }
+      if (timeoutDonut) {
+        if (hasBecameLeader) {
+          timeoutDonut.transition()
+            .style('fill', 'var(--timeout-track)')
+            .duration(100)
+            .attrTween('d', arcTween(PI_2))
+        } else {
+          timeoutDonut.transition()
+            .duration(100)
+            .attrTween('d', arcTween(0))
+        }
+      }
     }
-    if (hasBecomeLeader) {
-      timeoutDonut.transition()
-        .style('fill', 'var(--timeout-track)')
-        .duration(100)
-        .attrTween('d', arcTween(PI_2))
-    } else {
-      timeoutDonut.transition()
-        .duration(100)
-        .attrTween('d', arcTween(0))
-    }
-
   }
 
   return (

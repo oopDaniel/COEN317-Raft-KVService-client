@@ -6,6 +6,7 @@ import MachineContext from '../../shared/context/MachineContext'
 import { MSG_SINGLE_TRIP_TIME } from '../../shared/constants'
 import { exist } from '../../shared/utils'
 import './MessageMap.css';
+import { useObservable } from 'rxjs-hooks';
 
 const isDifferentLeader = (prevLeader, leader) => exist(prevLeader) && R.not(R.eqProps('id', leader, prevLeader))
 
@@ -17,6 +18,7 @@ function MessageMap () {
     leaderHeartbeatWithCommand$: leaderHeartbeat$,
     receivedUiHeartbeat$,
     receivedUiAck$,
+    candidate$,
   } = useContext(MachineContext)
 
   // Heartbeat
@@ -44,6 +46,12 @@ function MessageMap () {
       sub && sub.unsubscribe()
     }, () => {})
   }, [positionMap, liveness, leader, circleGroups])
+
+
+  const newCandidate = useObservable(() => candidate$, null)
+  useEffect(() => {
+    if (newCandidate) sendVoteRequest(newCandidate.id)
+  }, [newCandidate])
 
   // Acknowledgement
   const { followerTimer$ } = useContext(MachineContext)
@@ -82,7 +90,6 @@ function MessageMap () {
         .duration(MSG_SINGLE_TRIP_TIME)
         .attr('cx', d => d.x)
         .attr('cy', d => d.y)
-        // .filter(d => alive[d.id]) // todo
         .transition()
         .duration(0)
         .style('fill', 'var(--msg-ack')
@@ -107,6 +114,37 @@ function MessageMap () {
       .attr('cx', leaderX)
       .attr('cy', leaderY)
       .on('end', _ => receivedUiAck$.next(true))
+  }
+
+  function sendVoteRequest (id) {
+    const msgSvg = d3.select('svg.msg-svg')
+    msgSvg.selectAll('circle').remove()
+    const circles = msgSvg.selectAll('.circleGroups')
+      .data(R.values(R.omit([id], positionMap)))
+      .enter()
+      .append('circle')
+
+    const { x: candidateX, y: candidateY } = positionMap[id]
+    circles
+      .attr('r', 10)
+      .attr('cx', candidateX)
+      .attr('cy', candidateY)
+      .style('fill', 'var(--msg-vote-request)')
+      .transition()
+      .duration(MSG_SINGLE_TRIP_TIME)
+      .attr('cx', d => d.x)
+      .attr('cy', d => d.y)
+      .on('end', _ => receivedUiHeartbeat$.next({ mockTimer: 18000 }))
+      .filter(d => liveness[d.id])
+      .transition()
+      .duration(0)
+      .style('fill', 'var(--msg-ack')
+      .transition()
+      .duration(MSG_SINGLE_TRIP_TIME)
+      .attr('cx', candidateX)
+      .attr('cy', candidateY)
+
+    setCircleGroups(null) // cleanup for the followed heartbeat
   }
 
   return (
