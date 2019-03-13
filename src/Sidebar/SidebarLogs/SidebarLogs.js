@@ -3,7 +3,7 @@ import MachineContext from '../../shared/context/MachineContext'
 import './SidebarLogs.css';
 
 function SidebarLogs ({ hideFooter }) {
-  const { selectedLogs: logs = [] } = useContext(MachineContext)
+  const { selectedLogs: logs = [], selected } = useContext(MachineContext)
   return (
     <div className={`sidebar-logs ${hideFooter ? 'hide-footer' : '' }`}>
       {
@@ -34,7 +34,9 @@ function SidebarLogs ({ hideFooter }) {
                 )
               }
             })
-          : <div className="unavailable">No available logs</div>
+          : selected
+            ? <div className="unavailable">No available logs</div>
+            : <div>Select a machine to inspect</div>
       }
     </div>
   );

@@ -74,7 +74,7 @@ function Sidebar ({ customClass }) {
 
   const renderTitle = (hasSelected) => {
     if (hasSelected) return `${isLogs ? 'Logs' : 'Actions'} on Machine <${selected}>`
-    return 'Client Log History'
+    return 'Raft K/V Service Visualization'
   }
 
   return (
