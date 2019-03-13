@@ -130,7 +130,7 @@ function MessageMap () {
       .duration(MSG_SINGLE_TRIP_TIME)
       .attr('cx', d => d.x)
       .attr('cy', d => d.y)
-      .on('end', _ => receivedUiHeartbeat$.next({ mockTimer: 18000 }))
+      .on('end', _ => receivedUiHeartbeat$.next({ voteRequest: true }))
       .filter(d => liveness[d.id])
       .transition()
       .duration(0)

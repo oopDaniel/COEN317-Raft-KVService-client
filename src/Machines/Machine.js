@@ -1,16 +1,18 @@
 import React, { useEffect, useRef, useContext, useState } from 'react';
 import { useObservable } from 'rxjs-hooks';
 import { of } from 'rxjs';
-import { share, switchMap, filter, map, startWith, debounceTime, distinctUntilChanged, distinctUntilKeyChanged } from 'rxjs/operators';
+import { share, tap, switchMap, filter, map, startWith, debounceTime, distinctUntilChanged, distinctUntilKeyChanged, withLatestFrom } from 'rxjs/operators';
 import * as d3 from 'd3'
 import * as R from 'ramda'
 import { FaDatabase, FaCrown } from 'react-icons/fa';
 import { getInfo } from '../shared/api'
 import { exist } from '../shared/utils'
+import { ELECTION_DURATION_DIFF, ELECTION_DURATION_MIN } from '../shared/constants'
 import MachineContext from '../shared/context/MachineContext'
 import AppliedCommand from './AppliedCommand/AppliedCommand'
 import './Machine.css'
 
+const getRandomTimeout = () => Math.random() * ELECTION_DURATION_DIFF + ELECTION_DURATION_MIN
 const toUnifiedTimer = R.compose(R.multiply(1000), R.prop('timer'))
 const DONUT_UPDATE_INTERVAL = 600
 const PI_2 = 2 * Math.PI
@@ -90,30 +92,25 @@ function Machine (props) {
   // Update timer when received heartbeat and the msg circle reached machine on the UI
   const newTimer = useObservable(() => receivedUiHeartbeat$.pipe(
     // debounceTime(20),
-    // map(x => {
-    //   console.log(`[${id}]`, 'received UI heartbeat', x)
-    // }),
+    map(x => {
+      console.log(`[${id}]`, 'received UI heartbeat', x)
+    }),
+    tap(R.when(
+      R.both(exist, R.has('cmd')), // receive a heartbeat with cmd
+      setCmd
+    )),
     switchMap(R.ifElse(
-      R.both(exist, R.has('mockTimer')),
-      e => of(e).pipe(map(R.prop('mockTimer'))),
-      R.compose(
-        () => raft$.current.pipe(
-          filter(R.both(R.has('timer'), R.propEq('type', 'heartbeatReceived'))),
-          map(toUnifiedTimer),
-          debounceTime(100),
-        ),
-        R.when(
-          R.both(exist, R.has('cmd')), // receive a heartbeat with cmd
-          R.tap(setCmd)
-        )
-      ))
-    ),
-    startWith(Number.MAX_SAFE_INTEGER),
-    // map(x => {
-    //   console.log(`[${id}]`, 'new timer', x)
-    //   return x
-    // }),
-    distinctUntilChanged(),
+      R.both(exist, R.has('voteRequest')),
+      () => of(getRandomTimeout()),
+      () => raft$.current.pipe(
+        filter(R.both(R.has('timer'), R.propEq('type', 'heartbeatReceived'))),
+        map(toUnifiedTimer),
+        debounceTime(100),
+        distinctUntilChanged(),
+        startWith(getRandomTimeout())
+      )
+    )),
+    startWith(getRandomTimeout())
   ))
 
   // Update log for the selected machine
@@ -126,7 +123,7 @@ function Machine (props) {
 
   // Reset timer (update donut) when received heartbeat
   useEffect(() => {
-    // console.log(`[${id}] call update donut`)
+    console.log(`[${id}] call update donut`, newTimer)
     updateDonut()
   }, [newTimer])
 

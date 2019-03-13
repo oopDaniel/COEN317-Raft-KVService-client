@@ -75,8 +75,8 @@ forkJoin(...connections$)
   .pipe(first()) // only need to recognize available machines once
   .subscribe(connectionReplaySubject)
 
-const rawIos = sockets.map(socket => socket.io$)
-const rawIoMerged$ = combineLatest(...rawIos)
+const rawIos = sockets.map((socket, index) => socket.io$.pipe(map(R.assoc('index', index))))
+const rawIoMerged$ = merge(...rawIos)
 
 const rawIoWithTimeout$ = combineLatest(...sockets.map(
   socket =>
@@ -114,11 +114,7 @@ const liveness$ = mergedMachineLiveness$.pipe(
 const isLeader = R.propEq('leader', true)
 const isExistentLeader = R.both(exist, isLeader)
 const isExistentAndNotLeader = R.both(exist, R.complement(isLeader))
-const findAndAddIndexToLeader = R.converge(R.assoc('index'), [R.findIndex(isExistentLeader), R.find(isExistentLeader)])
-const leaderMsg$ = rawIoMerged$.pipe(
-  filter(R.any(isExistentLeader)),
-  map(findAndAddIndexToLeader),
-)
+const leaderMsg$ = rawIoMerged$.pipe(filter(isExistentLeader))
 
 // Ensure new leader won't be ignore, which happens when using only `leaderMsg$` :(
 const convertToLeaderMsgFromSingleSocket$ = new Subject()
@@ -134,7 +130,7 @@ const compareWithIdIfExists = R.ifElse(
   R.equals,
   R.eqProps('id')
 )
-const filterBasedOnLiveness = ([leader, liveness]) => leader && liveness[leader.index].alive ? leader : null
+const filterBasedOnLiveness = ([leader, liveness]) => leader && liveness[leader.index] && liveness[leader.index].alive ? leader : null
 
 const allLeaderMsg$ = merge(
   leaderMsg$,
@@ -142,6 +138,7 @@ const allLeaderMsg$ = merge(
 ).pipe(distinctUntilKeyChanged('id'))
 
 const leader$ = combineLatest(allLeaderMsg$, mergedMachineLiveness$).pipe(
+  tap(l => console.log('%c[leader]', 'color:blue;font-size:1em', l[0] && l[0].id)),
   map(filterBasedOnLiveness),
   distinctUntilChanged(compareWithIdIfExists),
   tap(l => console.log('%c[leader]', 'color:yellow;font-size:2em', l && l.id))
@@ -200,10 +197,7 @@ const machinePosMeta$ = new ReplaySubject(5).pipe(
 const uiHeartbeat$ = new Subject().pipe(debounceTime(50))
 const receivedUiHeartbeat$ = new Subject()
 const receivedUiAck$ = new Subject()
-const anyFollowerTimer$ = rawIoMerged$.pipe(
-  filter(R.any(isExistentAndNotLeader)),
-  map(R.find(isExistentAndNotLeader)),
-)
+const anyFollowerTimer$ = rawIoMerged$.pipe(filter(isExistentAndNotLeader))
 const receivedUiHeartbeatAndAck$ = receivedUiAck$.pipe(
   startWith(null),
   withLatestFrom(receivedUiHeartbeat$.pipe(
