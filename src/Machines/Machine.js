@@ -162,6 +162,9 @@ function Machine (props) {
     donut = timeoutDonut || donut
     if (!donut) return
 
+    // If reset, the donut timer is invalid (leader or dead)
+    if (resetDonutAsNeeded()) return
+
     // cleanup old interval
     if (d3Interval) {
       d3Interval.stop()
@@ -210,7 +213,9 @@ function Machine (props) {
             .attrTween('d', arcTween(0))
         }
       }
+      return true
     }
+    return false
   }
 
   return (
