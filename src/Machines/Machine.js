@@ -13,7 +13,6 @@ import AppliedCommand from './AppliedCommand/AppliedCommand'
 import './Machine.css'
 
 const getRandomTimeout = () => Math.random() * ELECTION_DURATION_DIFF + ELECTION_DURATION_MIN
-const toUnifiedTimer = R.compose(R.multiply(1000), R.prop('timer'))
 const DONUT_UPDATE_INTERVAL = 600
 const PI_2 = 2 * Math.PI
 const arc = d3.arc()
@@ -72,7 +71,7 @@ function Machine (props) {
   // Candidate requestVote timer
   const newCandidateTimer = useObservable(() => candidate$.pipe(
     filter(R.propEq('id', id)),
-    map(toUnifiedTimer)
+    map(R.prop('timer'))
   ), null)
 
   const toLeader$ = useRef(stateChange$.current.pipe(
@@ -91,9 +90,9 @@ function Machine (props) {
 
   // Update timer when received heartbeat and the msg circle reached machine on the UI
   const newTimer = useObservable(() => receivedUiHeartbeat$.pipe(
-    // debounceTime(20),
     map(x => {
       console.log(`[${id}]`, 'received UI heartbeat', x)
+      return x
     }),
     tap(R.when(
       R.both(exist, R.has('cmd')), // receive a heartbeat with cmd
@@ -104,7 +103,7 @@ function Machine (props) {
       () => of(getRandomTimeout()),
       () => raft$.current.pipe(
         filter(R.both(R.has('timer'), R.propEq('type', 'heartbeatReceived'))),
-        map(toUnifiedTimer),
+        map(R.prop('timer')),
         debounceTime(100),
         distinctUntilChanged(),
         startWith(getRandomTimeout())

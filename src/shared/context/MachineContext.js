@@ -23,6 +23,7 @@ import {
   first,
   share,
   filter,
+  bufferTime,
   distinctUntilChanged,
   distinctUntilKeyChanged,
   tap,
@@ -33,9 +34,9 @@ import {
 } from 'rxjs/operators'
 import { getInfo } from '../api'
 import { mapIndexed, exist } from '../utils'
-import { KNOWN_SERVER_IPS, HEARTBEAT_INTERVAL } from '../constants'
+import { KNOWN_SERVER_IPS } from '../constants'
 
-// Use `broadcastingEntries` to identify leader
+// ========= Some necessary processing to the raw socket msg =========
 const setLeaderFlag = R.when(
   R.anyPass([
     R.propEq('type', 'broadcastingEntries'),
@@ -44,8 +45,13 @@ const setLeaderFlag = R.when(
   ]),
   R.assoc('leader', true)
 )
+const unifyTimestamp = R.when(
+  R.has('timer'),
+  R.evolve({timer: R.multiply(1000)})
+)
 
-// Handle sockets
+
+// ========= Handle sockets =========
 const sockets = KNOWN_SERVER_IPS.map((ip, index) => {
   const id = String.fromCharCode(65 + index) // id increases with index and starts from 'A'
   const io = socketIO(ip)
@@ -60,6 +66,7 @@ const sockets = KNOWN_SERVER_IPS.map((ip, index) => {
     io$: fromEvent(io, 'raftEvent').pipe(
       // tap(q => console.log('<socks>', q)),
       map(R.compose(
+        unifyTimestamp,
         setLeaderFlag,
         e => R.mergeAll([identityObj, e])
       )),
@@ -68,7 +75,7 @@ const sockets = KNOWN_SERVER_IPS.map((ip, index) => {
   }
 })
 
-// Connection$: indicate alive machines
+// Connection$: indicate alive machines. (may be remove later if ever)
 const connections$ = sockets.map(so => so.conn$)
 const connectionReplaySubject = new ReplaySubject().pipe(share())
 forkJoin(...connections$)
@@ -78,50 +85,38 @@ forkJoin(...connections$)
 const rawIos = sockets.map((socket, index) => socket.io$.pipe(map(R.assoc('index', index))))
 const rawIoMerged$ = merge(...rawIos)
 
-const rawIoWithTimeout$ = combineLatest(...sockets.map(
-  socket =>
-    timer(0, HEARTBEAT_INTERVAL).pipe(
-      concatMapTo(race(
-        socket.io$,
-        of({ id: socket.id, ip: socket.ip, timeout: true })
-          .pipe(delay(HEARTBEAT_INTERVAL)) // Somehow necessary
-      ))
-    )
-)).pipe(share())
 
-const io$ = rawIoWithTimeout$.pipe(
-  debounceTime(1000),
-  filter(R.complement(R.all(R.isNil))),
+// ========= Liveness of machines =========
+const machineLivenessSubjects = sockets.map(
+  socket => new BehaviorSubject(true).pipe(map(alive => ({ alive, ...socket })))
 )
-
-// rawIoWithTimeout$.subscribe(e => console.log('%c[IO event]', 'color:lightgreen;font-size:1.2em', e))
-
-// Liveness of machines
-const machineLivenessSubjects = sockets.map(socket => ({ ...socket, sub: new BehaviorSubject(true) }))
-const machineLivenessSubjectMap = machineLivenessSubjects
-  .reduce((map, sub) => (map[sub.id] = sub) && map, {})
-const mergedMachineLiveness$ = combineLatest(...machineLivenessSubjects.map(s => s.sub))
-  .pipe(map(mapIndexed((alive, index) => ({ alive, id: sockets[index].id }))))
-
-const liveness$ = mergedMachineLiveness$.pipe(
+const machineLivenessSubjectMap = sockets
+  .reduce((map, soc, idx) => (map[soc.id] = machineLivenessSubjects[idx]) && map, {})
+const liveness$ = combineLatest(...machineLivenessSubjects).pipe(
   map(arr => arr.reduce((m, l) => {
     m[l.id] = l.alive
     return m
   }, {}))
 )
 
-// Stream of current leader
+
+// ========= Stream of leader / follower / candidate =========
 const isLeader = R.propEq('leader', true)
 const isExistentLeader = R.both(exist, isLeader)
 const isExistentAndNotLeader = R.both(exist, R.complement(isLeader))
-const leaderMsg$ = rawIoMerged$.pipe(filter(isExistentLeader))
 
-// Ensure new leader won't be ignore, which happens when using only `leaderMsg$` :(
+// Follower
+const rawFollowerMsg$ = rawIoMerged$.pipe(filter(isExistentAndNotLeader))
+const followerMsg$ = combineLatest(rawFollowerMsg$, liveness$).pipe(
+  map(([follower, liveness]) => ({ ...follower, alive: liveness[follower.id] })),
+)
+// Candidate
+const candidate$ = new Subject() // starts leader election
+// Leader
+const leaderMsg$ = rawIoMerged$.pipe(filter(isExistentLeader))
+// Receive individual socket msg from single component. Should also be a source of leader
 const convertToLeaderMsgFromSingleSocket$ = new Subject()
 
-const leaderHeartbeat$ = leaderMsg$.pipe(
-  debounceTime(4000) // suppose heartbeat interval is 6 sec, 4 should be sufficient.
-)
 const compareWithIdIfExists = R.ifElse(
   R.compose(
     R.any(R.isNil),
@@ -130,79 +125,32 @@ const compareWithIdIfExists = R.ifElse(
   R.equals,
   R.eqProps('id')
 )
-const filterBasedOnLiveness = ([leader, liveness]) => leader && liveness[leader.index] && liveness[leader.index].alive ? leader : null
+const filterBasedOnLiveness = ([leader, liveness]) => leader && liveness[leader.id] ? leader : null
+
+ // Suppose heartbeat interval is 6 sec, 4 should be sufficient.
+const leaderHeartbeat$ = leaderMsg$.pipe(debounceTime(4000))
 
 const allLeaderMsg$ = merge(
   leaderMsg$,
   convertToLeaderMsgFromSingleSocket$
 ).pipe(distinctUntilKeyChanged('id'))
 
-const leader$ = combineLatest(allLeaderMsg$, mergedMachineLiveness$).pipe(
-  tap(l => console.log('%c[leader]', 'color:blue;font-size:1em', l[0] && l[0].id)),
+// The current leader. Should always be the single source of truth
+const leader$ = combineLatest(allLeaderMsg$, liveness$).pipe(
   map(filterBasedOnLiveness),
   distinctUntilChanged(compareWithIdIfExists),
   tap(l => console.log('%c[leader]', 'color:yellow;font-size:2em', l && l.id))
 )
 
-// Timer of all followers. Required for sending ack in MsgMap component
-const followerTimer$ = io$.pipe(
-  map(R.compose(
-    R.reduce((m, e) => {
-      m[e.id] = (e.timeout || e.timer === undefined) ? -1 : e.timer * 1000 // sec to ms
-      return m
-    }, {}),
-    R.reject(R.anyPass([isLeader, R.complement(R.has('id'))])),
-    // Need index to find correct observable of liveness for filtering
-    mapIndexed((v, index) => ({ ...v, index }))
-  ))
-)
 
-// Command related
-const command$ = leaderMsg$.pipe(
-  filter(R.propEq('type', 'commandReceived')),
-  debounceTime(1000),
-)
-
-const leaderHeartbeatWithCommand$ = leaderHeartbeat$.pipe(
-  withLatestFrom(command$.pipe(startWith(null))),
-  map(([heartbeat, cmd]) => {
-    heartbeat.cmd = cmd
-    return heartbeat
-  })
-)
-
-const commandValid$ = followerTimer$.pipe(
-  withLatestFrom(command$),
-  map(([timerMap, cmd]) => {
-    const cmdSet = { ...cmd, applied: [] }
-    R.keys(timerMap).forEach(id => {
-      if (timerMap[id] !== -1) cmdSet.applied.push(id)
-    })
-    return cmdSet
-  }),
-  distinctUntilKeyChanged('cmd')
-)
-
-commandValid$.subscribe(e => console.log('%cvalid comnd ', 'color:green;font-size:2rem',e))
-
-// Machine info
-const machinePosMeta$ = new ReplaySubject(5).pipe(
-  bufferCount(5),
-  map(pos => pos.reduce((map, pos) => (map[pos.id] = pos) && map, {})),
-  first(),
-  share()
-)
-
-// UI Heartbeat - required for replying 1st ack
-const uiHeartbeat$ = new Subject().pipe(debounceTime(50))
-const receivedUiHeartbeat$ = new Subject()
+// ========= UI Heartbeat - required for msg circle delivery =========
+const receivedUiHeartbeat$ = new Subject().pipe(debounceTime(100))
 const receivedUiAck$ = new Subject()
-const anyFollowerTimer$ = rawIoMerged$.pipe(filter(isExistentAndNotLeader))
 const receivedUiHeartbeatAndAck$ = receivedUiAck$.pipe(
   startWith(null),
   withLatestFrom(receivedUiHeartbeat$.pipe(
     startWith(null),
-    withLatestFrom(anyFollowerTimer$.pipe(
+    withLatestFrom(followerMsg$.pipe(
       filter(R.has('timer')),
       debounceTime(200)
     )),
@@ -212,11 +160,65 @@ const receivedUiHeartbeatAndAck$ = receivedUiAck$.pipe(
   first()
 )
 
-// Follower starts leader election
-const candidate$ = new Subject()
+
+// Timer of all followers. Required for sending ack in MsgMap component
+const followerTimer$ = receivedUiHeartbeat$.pipe(
+  withLatestFrom(
+    followerMsg$.pipe(
+      bufferTime(1000),
+      map(R.compose(
+        R.map(R.unless(R.propEq('alive', true), R.assoc('timer', -1))),
+        R.reject(R.isNil)
+      )),
+      startWith([])
+    )
+  ),
+  map(R.compose(
+    R.reduce((m, f) => (m[f.id] = f.timer) && m, {}),
+    R.nth(1)
+  )),
+  debounceTime(1000)
+)
+
+
+// ========= Command related =========
+const command$ = leaderMsg$.pipe(
+  filter(R.propEq('type', 'commandReceived')),
+  debounceTime(1000),
+)
+const leaderHeartbeatWithCommand$ = leaderHeartbeat$.pipe(
+  withLatestFrom(command$.pipe(startWith(null))),
+  map(([heartbeat, cmd]) => {
+    heartbeat.cmd = cmd
+    return heartbeat
+  })
+)
+
+// const commandValid$ = followerTimer$.pipe(
+//   withLatestFrom(command$),
+//   map(([timerMap, cmd]) => {
+//     const cmdSet = { ...cmd, applied: [] }
+//     R.keys(timerMap).forEach(id => {
+//       if (timerMap[id] !== -1) cmdSet.applied.push(id)
+//     })
+//     return cmdSet
+//   }),
+//   distinctUntilKeyChanged('cmd')
+// )
+
+// commandValid$.subscribe(e => console.log('%cvalid comnd ', 'color:green;font-size:2rem',e))
+
+// Machine info
+const machinePosMeta$ = new ReplaySubject(5).pipe(
+  bufferCount(5),
+  map(pos => pos.reduce((map, pos) => (map[pos.id] = pos) && map, {})),
+  first(),
+  share()
+)
+
+// We finally reached context!
 
 const MachineContext = React.createContext()
-
 export function MachineProvider (props) {
   const [logs, setLogs] = useState({})
   const [selected, setSelected] = useState(null)
@@ -251,7 +253,7 @@ export function MachineProvider (props) {
       toggleMachine: () => {
         const prevState = liveness[selected]
         if (prevState !== undefined) {
-          machineLivenessSubjectMap[selected].sub.next(!prevState)
+          machineLivenessSubjectMap[selected].next(!prevState)
         }
       },
 
@@ -265,13 +267,12 @@ export function MachineProvider (props) {
 
       // Command
       command$,
-      commandValid$,
+      // commandValid$,
 
       // For single machine syncing donut
       sockets,
 
       // UI states for circle msg
-      uiHeartbeat$,
       receivedUiHeartbeat$,
       receivedUiAck$,
       receivedUiHeartbeatAndAck$,
@@ -296,7 +297,7 @@ function useMachineStateInitializer (machines) {
         map((e, i) => ({ ...machines[i], alive: R.path(['data', 'on/off'], e) }))
       ).subscribe(e => {
         if (!e.alive) {
-          machineLivenessSubjectMap[e.id].sub.next(false)
+          machineLivenessSubjectMap[e.id].next(false)
         }
       })
       return unsubscribe

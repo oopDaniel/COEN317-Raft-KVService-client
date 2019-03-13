@@ -59,7 +59,7 @@ function MessageMap () {
       console.log('%cunsubscribe...ack', 'color:#000;background:#fff')
       sub && sub.unsubscribe()
     }, () => {})
-  }, [followerTimer$, liveness, circleGroups, prevLeader])
+  }, [followerTimer$, circleGroups, prevLeader])
 
   function createMsgCircles (leader) {
     // console.log('<created circles> for leader', leader && leader.id)
@@ -95,7 +95,8 @@ function MessageMap () {
         })
   }
 
-  function replyAck () {
+  function replyAck (timerMap) {
+    console.warn(timerMap)
     // console.log(' (((- leader id', leader.id, 'prevLeader id:', prevLeader.id)
     const currLeader = leader || prevLeader
     if (!currLeader) {
@@ -104,7 +105,7 @@ function MessageMap () {
     }
     const { x: leaderX, y: leaderY } = positionMap[R.prop('id', currLeader)]
     circleGroups
-      .filter(d => liveness[d.id])
+      .filter(d => timerMap[d.id] !== undefined && timerMap[d.id] !== -1)
       .transition()
       .duration(MSG_SINGLE_TRIP_TIME)
       .attr('cx', leaderX)
