@@ -13,6 +13,7 @@ import  {
   timer,
   race,
   of,
+  merge,
 } from 'rxjs'
 import {
   debounceTime,
@@ -119,12 +120,11 @@ const leaderMsg$ = rawIoMerged$.pipe(
   map(findAndAddIndexToLeader),
 )
 
+// Ensure new leader won't be ignore, which happens when using only `leaderMsg$` :(
+const convertToLeaderMsgFromSingleSocket$ = new Subject()
+
 const leaderHeartbeat$ = leaderMsg$.pipe(
   debounceTime(4000) // suppose heartbeat interval is 6 sec, 4 should be sufficient.
-)
-const leaderFromIO$ = leaderMsg$.pipe(
-  distinctUntilKeyChanged('id'),
-  tap(l => console.log('%c[leader] (distinct)', 'color:yellow;font-size:2em', l && l.id))
 )
 const compareWithIdIfExists = R.ifElse(
   R.compose(
@@ -134,13 +134,17 @@ const compareWithIdIfExists = R.ifElse(
   R.equals,
   R.eqProps('id')
 )
-const filterBasedOnLiveness = ([leader, liveness]) => liveness[leader.index].alive ? leader : null
-const leader$ = combineLatest(
-  leaderFromIO$,
-  mergedMachineLiveness$
-).pipe(
+const filterBasedOnLiveness = ([leader, liveness]) => leader && liveness[leader.index].alive ? leader : null
+
+const allLeaderMsg$ = merge(
+  leaderMsg$,
+  convertToLeaderMsgFromSingleSocket$
+).pipe(distinctUntilKeyChanged('id'))
+
+const leader$ = combineLatest(allLeaderMsg$, mergedMachineLiveness$).pipe(
   map(filterBasedOnLiveness),
-  distinctUntilChanged(compareWithIdIfExists)
+  distinctUntilChanged(compareWithIdIfExists),
+  tap(l => console.log('%c[leader]', 'color:yellow;font-size:2em', l && l.id))
 )
 
 // Timer of all followers. Required for sending ack in MsgMap component
@@ -261,6 +265,7 @@ export function MachineProvider (props) {
       leader,
       leaderHeartbeat$,
       leaderHeartbeatWithCommand$,
+      convertToLeaderMsgFromSingleSocket$,
       followerTimer$,
       candidate$,
 

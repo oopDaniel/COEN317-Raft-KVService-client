@@ -32,19 +32,15 @@ function MessageMap () {
     const hasLeaderChanged = isDifferentLeader(prevLeader, leader)
     let sub
     if (!circleGroups || hasLeaderChanged) {
-      if (!circleGroups) {
-        createMsgCircles(leader)
-      } else {
-        createMsgCircles(leader)
-        setPrevLeader(leader)
-      }
+      createMsgCircles(leader)
+      if (circleGroups) setPrevLeader(leader)
     } else {
       sub = leaderHeartbeat$.subscribe(sendHeartbeatMsg)
     }
     return R.tryCatch(() => {
       console.log('%cunsubscribe...sender', 'color:#000;background:#fff')
       sub && sub.unsubscribe()
-    }, () => {})
+    })
   }, [positionMap, liveness, leader, circleGroups])
 
 

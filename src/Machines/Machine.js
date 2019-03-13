@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useContext, useState } from 'react';
 import { useObservable } from 'rxjs-hooks';
 import { of } from 'rxjs';
-import { share, switchMap, filter, map, startWith, debounceTime, distinctUntilKeyChanged } from 'rxjs/operators';
+import { share, switchMap, filter, map, startWith, debounceTime, distinctUntilChanged, distinctUntilKeyChanged } from 'rxjs/operators';
 import * as d3 from 'd3'
 import * as R from 'ramda'
 import { FaDatabase, FaCrown } from 'react-icons/fa';
@@ -34,6 +34,7 @@ function Machine (props) {
     receivedUiHeartbeat$,
     command$,
     candidate$,
+    convertToLeaderMsgFromSingleSocket$,
   } = useContext(MachineContext)
 
   const isSelected = selected === id
@@ -72,16 +73,26 @@ function Machine (props) {
     map(toUnifiedTimer)
   ), null)
 
-  const newLeaderElected = useObservable(() => stateChange$.current.pipe(
+  const toLeader$ = useRef(stateChange$.current.pipe(
     filter(R.propEq('to', 'L')),
     distinctUntilKeyChanged('id'),
-  ), null)
+  ))
+  useEffect(() => {
+    const { unsubscribe } = toLeader$.current.subscribe(convertToLeaderMsgFromSingleSocket$)
+    return R.tryCatch(unsubscribe)
+  }, [convertToLeaderMsgFromSingleSocket$])
+
+  const newLeaderElected = useObservable(() => toLeader$.current, null)
 
   // Broadcast if machine becomes candidate
   useFollowerToCandidateBroadcaster(stateChange$.current, candidate$)
 
   // Update timer when received heartbeat and the msg circle reached machine on the UI
   const newTimer = useObservable(() => receivedUiHeartbeat$.pipe(
+    // debounceTime(20),
+    // map(x => {
+    //   console.log(`[${id}]`, 'received UI heartbeat', x)
+    // }),
     switchMap(R.ifElse(
       R.both(exist, R.has('mockTimer')),
       e => of(e).pipe(map(R.prop('mockTimer'))),
@@ -97,7 +108,12 @@ function Machine (props) {
         )
       ))
     ),
-    startWith(Number.MAX_SAFE_INTEGER)
+    startWith(Number.MAX_SAFE_INTEGER),
+    // map(x => {
+    //   console.log(`[${id}]`, 'new timer', x)
+    //   return x
+    // }),
+    distinctUntilChanged(),
   ))
 
   // Update log for the selected machine
@@ -109,7 +125,10 @@ function Machine (props) {
   useEffect(() => { renderDonut() }, [])
 
   // Reset timer (update donut) when received heartbeat
-  useEffect(() => { updateDonut() }, [newTimer])
+  useEffect(() => {
+    // console.log(`[${id}] call update donut`)
+    updateDonut()
+  }, [newTimer])
 
   // Hide timer for leader or dead machine
   useEffect(() => { resetDonutAsNeeded() }, [liveness, leader])
