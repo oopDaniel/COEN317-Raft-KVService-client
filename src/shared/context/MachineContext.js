@@ -13,13 +13,10 @@ import  {
   merge,
 } from 'rxjs'
 import {
-  debounceTime,
   bufferCount,
-  buffer,
   map,
   startWith,
   first,
-  pairwise,
   share,
   filter,
   distinctUntilChanged,
@@ -30,8 +27,8 @@ import {
   withLatestFrom,
 } from 'rxjs/operators'
 import { getInfo } from '../api'
-import { exist } from '../utils'
-import { KNOWN_SERVER_IPS, HEARTBEAT_INTERVAL } from '../constants'
+import { exist, log } from '../utils'
+import { KNOWN_SERVER_IPS } from '../constants'
 
 // ========= Some necessary processing to the raw socket msg =========
 const setLeaderFlag = R.when(
@@ -61,7 +58,7 @@ const sockets = KNOWN_SERVER_IPS.map((ip, index) => {
       first(),
     ),
     io$: fromEvent(io, 'raftEvent').pipe(
-      // tap(q => console.log('<socks>', q)),
+      // tap(q => log.info('<socks>', q)),
       map(R.compose(
         unifyTimestamp,
         setLeaderFlag,
@@ -134,19 +131,19 @@ const allDistinctLeaderMsg$ = allLeaderMsg$.pipe(distinctUntilKeyChanged('id'))
 const leader$ = combineLatest(allDistinctLeaderMsg$, liveness$).pipe(
   map(filterBasedOnLiveness),
   distinctUntilChanged(compareWithIdIfExists),
-  tap(l => console.log('%c[leader]', 'color:yellow;font-size:2em', l && l.id))
+  tap(l => log.log('%c[leader]', 'color:yellow;font-size:2em', l && l.id))
 )
 
-const existentLeader$ = leader$.pipe(filter(exist),)
-const prevExistentLeader$ = existentLeader$.pipe(
-  pairwise(),
-  map(R.nth(0)),
-  tap(l => console.log('%c[prev leader]', 'color:green;font-size:1.2em', l && l.id))
-)
+// const existentLeader$ = leader$.pipe(filter(exist))
+// const prevExistentLeader$ = existentLeader$.pipe(
+//   pairwise(),
+//   map(R.nth(0)),
+//   tap(l => log.log('%c[prev leader]', 'color:green;font-size:1.2em', l && l.id))
+// )
 
 // Suppose heartbeat interval is 6 sec, 4 should be sufficient.
 const leaderHeartbeat$ = combineLatest(allLeaderMsg$, liveness$).pipe(
-  tap(e => console.log('heartbeating', e[0], e[1])),
+  tap(e => log.log(`(${e[0] && e[0].id}) heartbeating. Liveness:`, e[1])),
   filter(([leader, liveness]) => leader && liveness[leader.id]),
   map(R.nth(0)),
   throttleTime(2000)
@@ -171,36 +168,15 @@ const receivedUiHeartbeatAndAck$ = receivedUiAck$.pipe(
 )
 
 
-// Timer of all followers. Required for sending ack in MsgMap component
-const followerTimer$ = followerMsg$.pipe(
-  buffer(receivedUiHeartbeat$),
-  filter(R.complement(R.isEmpty)),
-  map(R.compose(
-    R.reduce((m, f) => ({...m, [f.id]: f}), {}),
-    R.map(R.unless(R.propEq('alive', true), R.assoc('timer', -1)))
-  ))
-)
-
-/*
-
-const followerTimer$ = receivedUiHeartbeat$.pipe(
-  withLatestFrom(
-    followerMsg$.pipe(
-      bufferTime(1000),
-      map(R.compose(
-        R.map(R.unless(R.propEq('alive', true), R.assoc('timer', -1))),
-        R.reject(R.isNil)
-      )),
-      startWith([])
-    )
-  ),
-  map(R.compose(
-    R.reduce((m, f) => (m[f.id] = f.timer) && m, {}),
-    R.nth(1)
-  )),
-  debounceTime(1000)
-)
-*/
+// ========= Timer of all followers =========
+// const followerTimer$ = followerMsg$.pipe(
+//   buffer(receivedUiHeartbeat$),
+//   filter(R.complement(R.isEmpty)),
+//   map(R.compose(
+//     R.reduce((m, f) => ({...m, [f.id]: f}), {}),
+//     R.map(R.unless(R.propEq('alive', true), R.assoc('timer', -1)))
+//   ))
+// )
 
 
 // ========= Command related =========
@@ -270,12 +246,9 @@ export function MachineProvider (props) {
 
       // Raft state
       leader,
-      existentLeader$,
-      prevExistentLeader$,
       leaderHeartbeat$,
       leaderHeartbeatWithCommand$,
       convertToLeaderMsgFromSingleSocket$,
-      followerTimer$,
       candidate$,
 
       // Command

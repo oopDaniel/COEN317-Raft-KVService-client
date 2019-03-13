@@ -1,7 +1,7 @@
-import React, { useState, useContext }from 'react';
+import React, { useState, useContext }from 'react'
 import Btn from '../../shared/Button/Button'
 import NotificationContext from '../../shared/context/NotificationContext'
-import './SidebarActions.css';
+import './SidebarActions.css'
 
 function SidebarActions ({ onCommand }) {
   const [key, setKey] = useState('')
@@ -35,7 +35,7 @@ function SidebarActions ({ onCommand }) {
       open('Command Submitted')
     } catch (e) {
       open('An error occurred.', e)
-      console.log('Error submitting command', e)
+      console.warn('Error submitting command', e)
     } finally {
       processingFunc(false)
     }
@@ -75,7 +75,7 @@ function SidebarActions ({ onCommand }) {
         >Get</Btn>
       </section>
     </div>
-  );
+  )
 }
 
-export default SidebarActions;
+export default SidebarActions

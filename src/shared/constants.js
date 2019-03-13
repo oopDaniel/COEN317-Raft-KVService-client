@@ -9,6 +9,7 @@ export const KNOWN_SERVER_IPS = [
   'http://localhost:85'
 ]
 
+export const IS_DEV = true
 
 export const HEARTBEAT_INTERVAL = 6000
 export const MSG_SINGLE_TRIP_TIME = 2000

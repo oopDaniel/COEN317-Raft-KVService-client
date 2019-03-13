@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react'
 import * as R from 'ramda'
-import { getState, putState, turnOn, turnOff } from '../shared/api';
+import { FaHeart, FaSkull, FaPowerOff } from 'react-icons/fa'
+import { getState, putState, turnOn, turnOff } from '../shared/api'
 import SidebarLogs from './SidebarLogs/SidebarLogs'
 import SidebarActions from './SidebarActions/SidebarActions'
 import Btn from '../shared/Button/Button'
 import MachineContext from '../shared/context/MachineContext'
 import NotificationContext from '../shared/context/NotificationContext'
-import { FaHeart, FaSkull, FaPowerOff } from 'react-icons/fa';
-import './Sidebar.css';
+import './Sidebar.css'
 
 function Sidebar ({ customClass }) {
   // Machine related logic: selection and status check
@@ -56,7 +56,7 @@ function Sidebar ({ customClass }) {
       toggleMachine()
       open(postHint)
     } catch (e) {
-      console.log(e)
+      console.warn('Error toggling machine', e)
       open('<Error> Unable to toggle machine.')
     }
   }
@@ -144,7 +144,7 @@ function Sidebar ({ customClass }) {
 
       </div>
     </div>
-  );
+  )
 }
 
-export default Sidebar;
+export default Sidebar

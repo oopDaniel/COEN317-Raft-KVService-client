@@ -1,6 +1,6 @@
-import React, { useContext } from 'react';
+import React, { useContext } from 'react'
 import MachineContext from '../../shared/context/MachineContext'
-import './SidebarLogs.css';
+import './SidebarLogs.css'
 
 function SidebarLogs ({ hideFooter }) {
   const { selectedLogs: logs = [], selected } = useContext(MachineContext)
@@ -39,7 +39,7 @@ function SidebarLogs ({ hideFooter }) {
             : <div>Select a machine to inspect</div>
       }
     </div>
-  );
+  )
 }
 
-export default SidebarLogs;
+export default SidebarLogs

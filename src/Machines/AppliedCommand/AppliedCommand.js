@@ -1,5 +1,4 @@
-import React from 'react';
-import * as R from 'ramda'
+import React from 'react'
 import './AppliedCommand.css'
 
 function AppliedCommand ({ isAlive, cmd = '' }) {

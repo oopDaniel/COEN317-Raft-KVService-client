@@ -1,8 +1,8 @@
-import React, { useContext } from 'react';
+import React, { useContext } from 'react'
 import Machine from './Machine'
 import MessageMap from './MessageMap/MessageMap'
 import MachineContext from '../shared/context/MachineContext'
-import './Machines.scss';
+import './Machines.scss'
 
 function Machines (props) {
   const { machines } = useContext(MachineContext)
@@ -23,7 +23,7 @@ function Machines (props) {
         <MessageMap />
       </div>
     </div>
-  );
+  )
 }
 
-export default Machines;
+export default Machines

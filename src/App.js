@@ -1,10 +1,10 @@
-import React, { Component } from 'react';
-import style from './App.css';
+import React, { Component } from 'react'
 import Machines from './Machines/Machines'
 import Sidebar from './Sidebar/Sidebar'
 import { MachineProvider } from './shared/context/MachineContext'
 import { NotificationProvider } from './shared/context/NotificationContext'
 import Notification from './shared/Notification/Notification'
+import style from './App.css'
 
 class App extends Component {
   render() {
@@ -18,8 +18,8 @@ class App extends Component {
           <Notification />
         </NotificationProvider>
       </div>
-    );
+    )
   }
 }
 
-export default App;
+export default App

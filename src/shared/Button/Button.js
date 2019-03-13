@@ -1,5 +1,5 @@
-import React from 'react';
-import './Button.css';
+import React from 'react'
+import './Button.css'
 
 const noop = () => {}
 function Button ({
@@ -27,7 +27,7 @@ function Button ({
         : children
       }
     </span>
-  );
+  )
 }
 
-export default Button;
+export default Button
