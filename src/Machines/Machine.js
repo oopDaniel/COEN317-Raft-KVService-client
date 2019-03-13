@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useContext, useState } from 'react';
 import { useObservable } from 'rxjs-hooks';
 import { of } from 'rxjs';
-import { share, tap, switchMap, filter, map, startWith, debounceTime, distinctUntilChanged, distinctUntilKeyChanged, withLatestFrom } from 'rxjs/operators';
+import { share, tap, switchMap, filter, map, startWith, throttleTime, debounceTime, distinctUntilChanged, distinctUntilKeyChanged, withLatestFrom } from 'rxjs/operators';
 import * as d3 from 'd3'
 import * as R from 'ramda'
 import { FaDatabase, FaCrown } from 'react-icons/fa';
@@ -91,12 +91,12 @@ function Machine (props) {
   // Update timer when received heartbeat and the msg circle reached machine on the UI
   const newTimer = useObservable(() => receivedUiHeartbeat$.pipe(
     map(x => {
-      console.log(`[${id}]`, 'received UI heartbeat', x)
+      // console.log(`[${id}]`, 'received UI heartbeat', x)
       return x
     }),
     tap(R.when(
       R.both(exist, R.has('cmd')), // receive a heartbeat with cmd
-      setCmd
+      R.compose(setCmd, R.prop('cmd'))
     )),
     switchMap(R.ifElse(
       R.both(exist, R.has('voteRequest')),
@@ -104,7 +104,7 @@ function Machine (props) {
       () => raft$.current.pipe(
         filter(R.both(R.has('timer'), R.propEq('type', 'heartbeatReceived'))),
         map(R.prop('timer')),
-        debounceTime(100),
+        debounceTime(2500),
         distinctUntilChanged(),
         startWith(getRandomTimeout())
       )
@@ -122,7 +122,7 @@ function Machine (props) {
 
   // Reset timer (update donut) when received heartbeat
   useEffect(() => {
-    console.log(`[${id}] call update donut`, newTimer)
+    // console.log(`[${id}] call update donut`, newTimer)
     updateDonut()
   }, [newTimer])
 
