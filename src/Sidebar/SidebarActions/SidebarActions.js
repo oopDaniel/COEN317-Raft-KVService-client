@@ -1,64 +1,118 @@
-import React, { useState, useContext }from 'react'
+import React, { useContext, useEffect, useReducer } from 'react'
 import Btn from '../../shared/Button/Button'
 import NotificationContext from '../../shared/context/NotificationContext'
 import './SidebarActions.css'
 
-function SidebarActions ({ onCommand }) {
-  const [key, setKey] = useState('')
-  const [value, setValue] = useState('')
-  const [fetchedFromRead, setFetchedFromRead] = useState(false)
-  const [isProcessingSet, setProcessingSet] = useState('')
-  const [isProcessingGet, setProcessingGet] = useState('')
-
-  const { open } = useContext(NotificationContext)
-
-  const startCommand = (isRead) => async () => {
-    // Clean up for 'Set'
-    if (!isRead) {
-      setKey('')
-      setValue('')
-    }
-
-    const processingFunc = isRead ? setProcessingGet : setProcessingSet
-    processingFunc(true)
-    try {
-      const res = await onCommand({
-        operation: isRead ? 'GET' : 'SET',
-        data: { key, value }
-      })
-      if (isRead) {
-        setValue(res.data || '')
-        setFetchedFromRead(true)
-      } else {
-        setFetchedFromRead(false)
+function reducer(state, action) {
+  let newState
+  switch (action.type) {
+    case 'cleanFocus':
+      return { ...state, fetchedFromRead: false }
+    case 'updateKey':
+      return { ...state, key: action.value }
+    case 'updateValue':
+      return { ...state, value: action.value }
+    case 'startCommand':
+      const isRead = action.value
+      newState = {
+        ...state,
+        args: {
+          isRead,
+          data: { key: state.key, value: state.value },
+        },
+        [isRead ? 'isProcessingGet' : 'isProcessingSet']: true,
       }
-      open('Command Submitted')
-    } catch (e) {
-      open('An error occurred.', e)
-      console.warn('Error submitting command', e)
-    } finally {
-      processingFunc(false)
-    }
+      if (!isRead) {
+        // Clean up if it's 'Set'
+        newState.key = ''
+        newState.value = ''
+      }
+      return newState
+    case 'finishCommand':
+      newState = {
+        ...state,
+        fetchedFromRead: action.value.isRead,
+        value: action.value.data || '',
+        isProcessingGet: false,
+        isProcessingSet: false,
+        args: null,
+      }
+      return newState
+    case 'gotError':
+      return {
+        ...state,
+        isProcessingGet: false,
+        isProcessingSet: false,
+        args: null,
+      }
+    default:
+      throw new Error()
   }
+}
+
+function SidebarActions({ onCommand }) {
+  const { open } = useContext(NotificationContext)
+  const [
+    { key, value, args, fetchedFromRead, isProcessingSet, isProcessingGet },
+    dispatch,
+  ] = useReducer(reducer, {
+    key: '',
+    value: '',
+    args: null,
+    isProcessingSet: false,
+    isProcessingGet: false,
+    fetchedFromRead: false,
+  })
+
+  useEffect(() => {
+    if (args !== null) {
+      callApi(args).then(dispatch)
+    }
+
+    async function callApi({ isRead, data }) {
+      let nextAction
+      try {
+        const res = await onCommand({
+          operation: isRead ? 'GET' : 'SET',
+          data,
+        })
+        nextAction = {
+          type: 'finishCommand',
+          value: {
+            isRead,
+            data: res.data,
+          },
+        }
+        open('Command Submitted')
+      } catch (e) {
+        open('An error occurred.', e)
+        console.warn('Error submitting command', e)
+        nextAction = { type: 'gotError' }
+      }
+      return nextAction
+    }
+  }, [args, open, dispatch])
 
   return (
     <div className="sidebar-actions">
       <section className="form">
         <input
-            className="input"
-            placeholder="Key"
-            type="text"
-            value={key}
-            onChange={e => setKey(e.target.value)}
-          />
+          className="input"
+          placeholder="Key"
+          type="text"
+          value={key}
+          onChange={e => dispatch({ type: 'updateKey', value: e.target.value })}
+        />
 
         <input
           className={`input ${fetchedFromRead ? 'highlight' : ''}`}
           placeholder="Value"
           type="text"
           value={value}
-          onFocus={() => setFetchedFromRead(false)}
-          onChange={e => setValue(e.target.value)}
+          onFocus={() => dispatch({ type: 'cleanFocus' })}
+          onChange={e =>
+            dispatch({ type: 'updateValue', value: e.target.value })
+          }
         />
       </section>
 
@@ -66,13 +120,17 @@ function SidebarActions ({ onCommand }) {
         <Btn
           disabled={key === ''}
           processing={isProcessingSet}
-          onClick={startCommand(false)}
-        >Set</Btn>
+          onClick={() => dispatch({ type: 'startCommand', value: false })}
+        >
+          Set
+        </Btn>
         <Btn
           disabled={key === ''}
           processing={isProcessingGet}
-          onClick={startCommand(true)}
-        >Get</Btn>
+          onClick={() => dispatch({ type: 'startCommand', value: true })}
+        >
+          Get
+        </Btn>
       </section>
     </div>
   )
