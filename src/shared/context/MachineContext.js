@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useObservable } from 'rxjs-hooks'
 import socketIO from 'socket.io-client'
 import * as R from 'ramda'
-import  {
+import {
   BehaviorSubject,
   ReplaySubject,
   Subject,
@@ -42,9 +42,13 @@ const setLeaderFlag = R.when(
 const toInt = n => ~~n
 const unifyTimestamp = R.when(
   R.has('timer'),
-  R.evolve({timer: R.compose(toInt, R.multiply(1000))})
+  R.evolve({
+    timer: R.compose(
+      toInt,
+      R.multiply(1000)
+    ),
+  })
 )
-
 
 // ========= Handle sockets =========
 const sockets = KNOWN_SERVER_IPS.map((ip, index) => {
@@ -56,17 +60,19 @@ const sockets = KNOWN_SERVER_IPS.map((ip, index) => {
     io,
     conn$: fromEvent(io, 'connect').pipe(
       map(_ => identityObj),
-      first(),
+      first()
     ),
     io$: fromEvent(io, 'raftEvent').pipe(
       // tap(q => log.info('<socks>', q)),
-      map(R.compose(
-        unifyTimestamp,
-        setLeaderFlag,
-        e => R.mergeAll([identityObj, e])
-      )),
-      startWith(null), // Indicate socket exists
-    )
+      map(
+        R.compose(
+          unifyTimestamp,
+          setLeaderFlag,
+          e => R.mergeAll([identityObj, e])
+        )
+      ),
+      startWith(null) // Indicate socket exists
+    ),
   }
 })
 
@@ -77,23 +83,27 @@ forkJoin(...connections$)
   .pipe(first()) // only need to recognize available machines once
   .subscribe(connectionReplaySubject)
 
-const rawIos = sockets.map((socket, index) => socket.io$.pipe(map(R.assoc('index', index))))
+const rawIos = sockets.map((socket, index) =>
+  socket.io$.pipe(map(R.assoc('index', index)))
+)
 const rawIoMerged$ = merge(...rawIos).pipe(share())
 
-
 // ========= Liveness of machines =========
-const machineLivenessSubjects = sockets.map(
-  socket => new BehaviorSubject(true).pipe(map(alive => ({ alive, ...socket })))
+const machineLivenessSubjects = sockets.map(socket =>
+  new BehaviorSubject(true).pipe(map(alive => ({ alive, ...socket })))
 )
-const machineLivenessSubjectMap = sockets
-  .reduce((map, soc, idx) => (map[soc.id] = machineLivenessSubjects[idx]) && map, {})
+const machineLivenessSubjectMap = sockets.reduce(
+  (map, soc, idx) => (map[soc.id] = machineLivenessSubjects[idx]) && map,
+  {}
+)
 const liveness$ = combineLatest(...machineLivenessSubjects).pipe(
-  map(arr => arr.reduce((m, l) => {
-    m[l.id] = l.alive
-    return m
-  }, {}))
+  map(arr =>
+    arr.reduce((m, l) => {
+      m[l.id] = l.alive
+      return m
+    }, {})
+  )
 )
-
 
 // ========= Stream of leader / follower / candidate =========
 const isLeader = R.propEq('leader', true)
@@ -103,24 +113,28 @@ const isExistentAndNotLeader = R.both(exist, R.complement(isLeader))
 // Follower
 const rawFollowerMsg$ = rawIoMerged$.pipe(filter(isExistentAndNotLeader))
 const followerMsg$ = combineLatest(rawFollowerMsg$, liveness$).pipe(
-  map(([follower, liveness]) => ({ ...follower, alive: liveness[follower.id] })),
+  map(([follower, liveness]) => ({ ...follower, alive: liveness[follower.id] }))
 )
 // Candidate
 const candidate$ = new Subject() // starts leader election
 // Leader
-const leaderMsg$ = rawIoMerged$.pipe(filter(isExistentLeader), share())
+const leaderMsg$ = rawIoMerged$.pipe(
+  filter(isExistentLeader),
+  share()
+)
 // Receive individual socket msg from single component. Should also be a source of leader
 const convertToLeaderMsgFromSingleSocket$ = new Subject()
 
 const compareWithIdIfExists = R.ifElse(
   R.compose(
     R.any(R.isNil),
-    R.unapply(R.identity), // to array
+    R.unapply(R.identity) // to array
   ),
   R.equals,
   R.eqProps('id')
 )
-const filterBasedOnLiveness = ([leader, liveness]) => leader && liveness[leader.id] ? leader : null
+const filterBasedOnLiveness = ([leader, liveness]) =>
+  leader && liveness[leader.id] ? leader : null
 
 const allLeaderMsg$ = merge(
   leaderMsg$,
@@ -150,24 +164,26 @@ const leaderHeartbeat$ = combineLatest(allLeaderMsg$, liveness$).pipe(
   throttleTime(2000)
 )
 
-
 // ========= UI Heartbeat - required for msg circle delivery =========
 const receivedUiHeartbeat$ = new Subject().pipe(throttleTime(100))
 const receivedUiAck$ = new Subject()
 const receivedUiHeartbeatAndAck$ = receivedUiAck$.pipe(
   startWith(null),
-  withLatestFrom(receivedUiHeartbeat$.pipe(
-    startWith(null),
-    withLatestFrom(followerMsg$.pipe(
-      filter(R.has('timer')),
-      throttleTime(200)
-    )),
-    map(R.nth(0))
-  )),
+  withLatestFrom(
+    receivedUiHeartbeat$.pipe(
+      startWith(null),
+      withLatestFrom(
+        followerMsg$.pipe(
+          filter(R.has('timer')),
+          throttleTime(200)
+        )
+      ),
+      map(R.nth(0))
+    )
+  ),
   filter(R.all(exist)),
   first()
 )
-
 
 // ========= Timer of all followers =========
 // const followerTimer$ = followerMsg$.pipe(
@@ -178,7 +194,6 @@ const receivedUiHeartbeatAndAck$ = receivedUiAck$.pipe(
 //     R.map(R.unless(R.propEq('alive', true), R.assoc('timer', -1)))
 //   ))
 // )
-
 
 // ========= Command related =========
 const command$ = leaderMsg$.pipe(
@@ -194,19 +209,17 @@ const leaderHeartbeatWithCommand$ = leaderHeartbeat$.pipe(
   })
 )
 
-
 // Machine info
 const machinePosMeta$ = new ReplaySubject(5).pipe(
   bufferCount(5),
   map(pos => pos.reduce((map, pos) => (map[pos.id] = pos) && map, {})),
-  first(),
   share()
 )
 
 // We finally reached context!
 
 const MachineContext = React.createContext()
-export function MachineProvider (props) {
+export function MachineProvider(props) {
   const [logs, setLogs] = useState({})
   const [selected, setSelected] = useState(null)
 
@@ -220,70 +233,78 @@ export function MachineProvider (props) {
   useMachineStateInitializer(machines)
 
   return (
-    <MachineContext.Provider value={{
-      // Log related
-      logs,
-      selectedLogs: (selected && logs[selected] && logs[selected].logs) || [],
-      updateLog: (id, newLog) => setLogs({
-        ...logs,
-        [id]: newLog
-      }),
+    <MachineContext.Provider
+      value={{
+        // Log related
+        logs,
+        selectedLogs: (selected && logs[selected] && logs[selected].logs) || [],
+        updateLog: (id, newLog) =>
+          setLogs({
+            ...logs,
+            [id]: newLog,
+          }),
 
-      // Machines and their info
-      machines,
-      machinePosMeta$, // Subject to emit data
-      machinePosMeta, // Parsed data
+        // Machines and their info
+        machines,
+        machinePosMeta$, // Subject to emit data
+        machinePosMeta, // Parsed data
 
-      // Machine state
-      machineLivenessSubjectMap,
-      liveness$,
-      liveness,
-      toggleMachine: () => {
-        const prevState = liveness[selected]
-        if (prevState !== undefined) {
-          machineLivenessSubjectMap[selected].next(!prevState)
-        }
-      },
+        // Machine state
+        machineLivenessSubjectMap,
+        liveness$,
+        liveness,
+        toggleMachine: () => {
+          const prevState = liveness[selected]
+          if (prevState !== undefined) {
+            machineLivenessSubjectMap[selected].next(!prevState)
+          }
+        },
 
-      // Raft state
-      leader,
-      leaderHeartbeat$,
-      leaderHeartbeatWithCommand$,
-      convertToLeaderMsgFromSingleSocket$,
-      candidate$,
+        // Raft state
+        leader,
+        leaderHeartbeat$,
+        leaderHeartbeatWithCommand$,
+        convertToLeaderMsgFromSingleSocket$,
+        candidate$,
 
-      // Command
-      command$,
+        // Command
+        command$,
 
-      // For single machine syncing donut
-      sockets,
+        // For single machine syncing donut
+        sockets,
 
-      // UI states for circle msg
-      receivedUiHeartbeat$,
-      receivedUiAck$,
-      receivedUiHeartbeatAndAck$,
+        // UI states for circle msg
+        receivedUiHeartbeat$,
+        receivedUiAck$,
+        receivedUiHeartbeatAndAck$,
 
-      // Machine selection
-      selected,
-      select: setSelected,
-      unselect: () => setSelected(null),
-    }}>
-      { props.children }
+        // Machine selection
+        selected,
+        select: setSelected,
+        unselect: () => setSelected(null),
+      }}
+    >
+      {props.children}
     </MachineContext.Provider>
   )
 }
 
-function useMachineStateInitializer (machines) {
+function useMachineStateInitializer(machines) {
   useEffect(() => {
     if (machines.length) {
-      const { unsubscribe } = from(machines).pipe(
-        concatMap(m => getInfo(m.ip)),
-        map((e, i) => ({ ...machines[i], alive: R.path(['data', 'on/off'], e) }))
-      ).subscribe(e => {
-        if (!e.alive) {
-          machineLivenessSubjectMap[e.id].next(false)
-        }
-      })
+      const { unsubscribe } = from(machines)
+        .pipe(
+          concatMap(m => getInfo(m.ip)),
+          map((e, i) => ({
+            ...machines[i],
+            alive: R.path(['data', 'on/off'], e),
+          }))
+        )
+        .subscribe(e => {
+          if (!e.alive) {
+            machineLivenessSubjectMap[e.id].next(false)
+          }
+        })
       return unsubscribe
     }
   }, [machines])
