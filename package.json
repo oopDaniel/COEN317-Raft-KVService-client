@@ -31,5 +31,11 @@
   ],
   "devDependencies": {
     "node-sass": "^4.11.0"
+  },
+  "prettier": {
+    "semi": false,
+    "singleQuote": true,
+    "trailingComma": "es5",
+    "parser": "babel"
   }
 }
