@@ -1,10 +1,12 @@
 import React from 'react'
 import './AppliedCommand.css'
 
-function AppliedCommand ({ isAlive, cmd = '' }) {
-  const [ operation, key ] = cmd.split('|')
+function AppliedCommand({ isAlive, cmd = '' } = { cmd: '' }) {
+  const [operation, key] = cmd.split('|')
   return (
-    <div className={`${operation ? 'applied-cmd' : ''} ${isAlive ? '' : 'dead'}`}>
+    <div
+      className={`${operation ? 'applied-cmd' : ''} ${isAlive ? '' : 'dead'}`}
+    >
       {operation ? `${operation}(${key})` : ''}
     </div>
   )
